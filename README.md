@@ -3,8 +3,8 @@
 Menu generator is a web app that allows users to create a graphical menu for each menu item(s). The graphical menu can
 be created by using the following fields:
 
-* text-to-image: Text input box to enter a description of the menu item(s) (e.g. "a burger with fries and a soda").
-* text-and-image-to-image: Image upload with drag and drop or icon to open file explorer (e.g. opens Mac OS X finder) to
+- text-to-image: Text input box to enter a description of the menu item(s) (e.g. "a burger with fries and a soda").
+- text-and-image-to-image: Image upload with drag and drop or icon to open file explorer (e.g. opens Mac OS X finder) to
   select an image from the user's device with the menu item(s).
 
 If the user uploads an im/age, the web app will use the image as a reference for the menu item(s). Otherwise, the web
@@ -15,7 +15,7 @@ item.
 
 ## Generator models
 
-* Nano Banna (gemini-2.5-flash-image) https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-image
+- Nano Banna (gemini-2.5-flash-image) https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-image
 
 ## Deployment
 
@@ -35,5 +35,5 @@ https://dloopensource.github.io/menu-generator.github.io/
 
 ## Technologies used
 
-* Vite, React, TypeScript: https://vite.dev/guide/
-* Testing: Vitest for unit tests
+- Vite, React, TypeScript: https://vite.dev/guide/
+- Testing: Vitest for unit tests
