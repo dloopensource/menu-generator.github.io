@@ -1,2 +1,0 @@
-# menu-generator
-menu generator
