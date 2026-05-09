@@ -25,4 +25,4 @@ npm run deploy
 ```
 
 Your site will be built and deployed using the latest `main` branch. This is served by GitHub Pages at
-https://dloopensource.github.io/menu-generator.github.io
+https://dloopensource.github.io/menu-generator.github.io/
