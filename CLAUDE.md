@@ -1,6 +1,8 @@
-## Tools Agents MUST use when working on this project
+## Tools Agents MUST use
 
-## Specifications written in Allium
+Below are the tools when Agents MUST use working on this project.
+
+### Specifications written in Allium
 
 * Specifications must be written using Allium
 * See documentation for more information: https://github.com/juxt/allium
