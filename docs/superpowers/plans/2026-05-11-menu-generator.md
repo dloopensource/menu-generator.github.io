@@ -87,12 +87,39 @@ menu-generator.github.io/
 
 ## Conventions used in every task
 
-- **Project task lifecycle (per spec §8):** every task starts by creating a GitHub Project task in `Backlog`, self-assigning it, moving to `Ready` → `In progress`. PR open ⇒ `In review`. Merge ⇒ `Done`. Owner mapping is in the task header.
+- **Integration branch:** all PRs target `implement-menu-gen` (long-lived). Every task is on a short-lived branch `task/NN-<slug>` cut from the latest `implement-menu-gen`. No one commits to `implement-menu-gen` directly. See spec §8.6 for the full branch model.
+- **Block-until-merged:** the controller does not dispatch the next task's implementer until the current task's PR is merged into `implement-menu-gen`. One open PR at a time. No stacked PRs.
+- **PR review by agents:**
+  - **`code-health`** reviews every PR (code quality, tech debt, oversized files, weak tests, stale docs).
+  - **`allium:weed`** reviews every PR that touches `specs/*.allium` or any code bound to a spec (spec ↔ code drift). Skipped for pure-infra PRs.
+  - The **owning agent** fixes any issue raised by either reviewer before the PR can merge. Reviewers do not push fixes themselves.
+- **Merge policy:** squash merge (`gh pr merge <num> --squash --delete-branch`). Squash commit title = PR title (`Task NN: <name>`), so `implement-menu-gen`'s log reads as a task ledger.
+- **Project task lifecycle (per spec §8):** every task starts by creating a GitHub Project task in `Backlog`, self-assigning it, moving to `Ready` → `In progress` at branch cut. PR open ⇒ `In review`. PR merged ⇒ `Done`. **Local commits without a merged PR do not move the item past `In review`.** Owner mapping is in the task header.
 - **TDD:** write failing test → run and confirm it fails *for the right reason* → write minimal implementation → run test green → commit.
 - **`npm test` defaults to watch.** Use `npm run test:run` for one-shot CI-like runs. New tasks should run the specific spec via `npm run test:run -- path/to/file.test.ts`.
-- **Commit style** matches existing repo: short imperative, lowercase, no scope. Example: `add MenuGenerator service interface and fake impl`. Co-authored-by trailer optional.
+- **Commit style** matches existing repo: short imperative, lowercase, no scope. Example: `add MenuGenerator service interface and fake impl`. Co-authored-by trailer optional. Squash-merge replaces these per-commit messages with the PR title on `implement-menu-gen`; original commits remain visible in the closed PR.
 - **Allium commands:** `allium check specs/<file>.allium` validates a spec. `allium analyse specs/<file>.allium` reports coverage. `allium:propagate` (skill) emits test skeletons. `allium:weed` (skill) reports spec ↔ code drift.
-- **Owner column in task headers:** `frontend-engineer` writes production code, `test-engineer` writes test code, `allium:tend` writes specs and diagrams, `allium:weed` audits at merge. Where one task has multiple owners, split into sub-tasks per spec §8.
+- **Owner column in task headers:** `frontend-engineer` writes production code, `test-engineer` writes test code, `allium:tend` writes specs and diagrams. Reviewers (`code-health`, `allium:weed`) are dispatched by the controller after the owning agent opens the PR. Where one task has multiple owners (e.g., infra with both frontend-engineer and test-engineer), split into sub-tasks per spec §8.
+
+### Per-task git workflow (every task uses this exact sequence)
+
+```
+1.  git fetch origin
+2.  git checkout -b task/NN-<slug> origin/implement-menu-gen
+3.  ... do the work, write tests, commit small ...
+4.  npm run lint && npm run test:run && npm run build   # all must pass
+5.  git push -u origin task/NN-<slug>
+6.  gh pr create --base implement-menu-gen \
+       --title "Task NN: <name>" \
+       --body "<links to plan, spec, Project item, test/lint output>"
+7.  Move Project item to "In review"
+8.  Wait for code-health (and allium:weed if applicable) reviews.
+9.  Address any review findings on the SAME branch; push fixes; reviewers re-run.
+10. Once approved: gh pr merge <num> --squash --delete-branch
+11. Move Project item to "Done"
+12. Locally: git fetch && git checkout implement-menu-gen && git pull
+    (so the next task's branch is cut from the fresh tip)
+```
 
 ---
 

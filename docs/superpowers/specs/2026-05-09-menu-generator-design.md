@@ -363,21 +363,34 @@ No new top-level config files beyond `vitest.config.ts`. Existing TS / ESLint / 
 | `test-engineer` | Writes all Vitest test code: completes propagated skeletons, fills in RTL / `user-event` interactions, writes contract tests, writes flow tests. Owns `vitest.config.ts`, `src/__tests__/setup.ts`, and every `*.test.ts(x)` file. **Does not write production code.** |
 | `frontend-engineer` | Writes all production code: components, hooks, reducers, services, styles. Implements until the failing tests go green. Owns everything under `src/` that is **not** a test file. **Does not author tests** (may run them and report failures, but extending or modifying tests goes back to test-engineer). |
 
-`code-health` runs periodically, out of the critical path, for tech-debt sweeps. It can file follow-up GitHub Project tasks but does not own feature work.
+**Review agents** sit between the implementer and merge. Every PR runs both before merge:
+
+- `code-health` reviews the PR for code quality issues: tech debt, redundant systems, oversized files, weak tests, stale docs, naming, structure. It can block merge by leaving Important / Critical findings.
+- `allium:weed` reviews the PR for spec ↔ code drift against any Allium spec the change touches. It is skipped for changes that touch no spec (e.g., pure infra). It can block merge by reporting drift.
+
+The owning agent (the one that opened the PR) **fixes** any issues raised by either reviewer before merge. Reviewers do not commit fixes themselves — they only report. After fixes land, the relevant reviewer re-runs and either approves or reports remaining issues. This loop continues until both reviewers approve (or the issue is downgraded after explicit human override, recorded in the PR thread).
 
 ### 8.2 Per-spec lifecycle
 
-Every Allium spec follows the same five phases:
+Every Allium spec follows the same phased lifecycle. Every phase ends with a merged PR — no phase is "done in spirit" because the code was committed locally:
 
 ```
-1. allium:tend           writes  specs/<feature>.allium
-2. allium:propagate      emits   src/.../<feature>.test.* (failing skeletons)
-3. test-engineer         fills in failing Vitest tests against the spec
-4. frontend-engineer     implements src/.../<feature>.ts(x) until tests pass
-5. allium:weed           verifies  spec ↔ code alignment, blocks merge on drift
+1. allium:tend           creates task/NN-spec-<feature> branch off implement-menu-gen,
+                          writes specs/<feature>.allium, opens PR → implement-menu-gen
+   review                 allium:weed (where applicable) + code-health on the spec PR
+   merge                  controller (or merging agent) merges and walks Project item to Done
+2. allium:propagate      on the merged base, emits src/.../<feature>.test.* (failing skeletons)
+3. test-engineer         creates task/NN-tests-<feature>, fills failing Vitest tests, opens PR
+   review                 code-health (test quality) + allium:weed (where applicable)
+   merge                  merge into implement-menu-gen
+4. frontend-engineer     creates task/NN-impl-<feature>, implements until tests pass, opens PR
+   review                 code-health (code quality) + allium:weed (spec drift)
+   merge                  merge into implement-menu-gen — only now is the feature done
 ```
 
-**Phase 4 cannot start until phase 3 produces tests that run and fail for the right reason** — TDD discipline from CLAUDE.md and the starter plan. Phases 1–3 for spec *N+1* may run in parallel with phase 4 of spec *N* (different agents, different files).
+**Block-until-merged rule:** Phase N+1 cannot start until phase N's PR is merged into `implement-menu-gen`. This applies between phases of the same spec and across specs. The next-spec branch is cut off the freshly-merged tip of `implement-menu-gen`, never off a stale local commit. Rationale: every agent works from green — reviews have run, drift has been audited, the build passes.
+
+**Phase 4 cannot start until phase 3 produces tests that run and fail for the right reason** — TDD discipline from CLAUDE.md. With the block-until-merged rule above, this is naturally enforced: phase-3 tests must be on `implement-menu-gen` (i.e., merged and visible) before the phase-4 branch is cut.
 
 ### 8.3 GitHub Project tasks
 
@@ -385,11 +398,11 @@ Each Allium spec yields **three linked Project tasks**, in this order. **Each ta
 
 | Task title pattern | Owner / created by | Blocks | Definition of done |
 |---|---|---|---|
-| `Spec: <feature>` | `allium:tend` | the two below | `specs/<feature>.allium` committed; `allium check` passes; propagated skeletons emitted |
-| `Tests: <feature>` | `test-engineer` | the impl task below | All test files for the feature exist and fail with informative messages; no `.skip` / `xfail`; PR description quotes the failing output |
-| `Implement: <feature>` | `frontend-engineer` | next spec's impl, if dependent | All tests for the feature pass; `npm run lint` clean; `allium:weed` reports no drift |
+| `Spec: <feature>` | `allium:tend` | the two below | `specs/<feature>.allium` committed; `allium check` passes; propagated skeletons emitted; PR opened to `implement-menu-gen`, reviewed by `code-health` + `allium:weed`, and **merged** |
+| `Tests: <feature>` | `test-engineer` | the impl task below | All test files for the feature exist and fail with informative messages; no `.skip` / `xfail`; PR description quotes the failing output; PR opened, reviewed by `code-health` (+ `allium:weed` where the file binds to a spec), and **merged** |
+| `Implement: <feature>` | `frontend-engineer` | next spec's impl, if dependent | All tests for the feature pass; `npm run lint` clean; PR opened, `code-health` approves, `allium:weed` reports no drift, and the PR is **merged** into `implement-menu-gen` |
 
-**Column lifecycle (per CLAUDE.md):** `Backlog` (just created, may have unmet blockers) → `Ready` (all blockers `Done`) → `In progress` (work has started; transition is the agent's first action of the session) → `In review` (PR open) → `Done` (merged). The owning agent owns every transition; no other agent moves the task on its behalf.
+**Column lifecycle (per CLAUDE.md):** `Backlog` (just created, may have unmet blockers) → `Ready` (all blockers `Done`) → `In progress` (work has started; transition is the agent's first action of the session, also the moment the per-task branch is cut) → `In review` (PR opened against `implement-menu-gen`) → `Done` (PR merged after `code-health` and `allium:weed` both approve). The owning agent owns every transition; no other agent moves the task on its behalf. **A task is not `Done` until its PR is merged** — local commits without a merged PR keep the task in `In review`.
 
 ### 8.4 Cross-cutting / infra tasks
 
@@ -410,7 +423,59 @@ Every Project task description (all three rows of Section 8.3) links to:
 3. The test file path (`src/.../<feature>.test.*`).
 4. The production file path (`src/.../<feature>.ts(x)`).
 
-Opening any Project task answers the questions: *what spec does this implement, what tests prove it, which files change.*
+Opening any Project task answers the questions: *what spec does this implement, what tests prove it, which files change, which PR landed it.*
+
+### 8.6 Git workflow and PR review
+
+The branch model has three layers:
+
+```
+main                    (production — GitHub Pages serves the build of this branch)
+└── develop             (integration target for the v1 release)
+    └── plan-and-spec-web-app  (this design doc + the implementation plan live here)
+        └── implement-menu-gen ← long-lived integration branch for implementation work
+            ├── task/01-test-harness        ← per-task short-lived branch
+            ├── task/02-design-tokens
+            ├── task/03-spec-menu-generator
+            ├── ...
+            └── task/NN-<feature>
+```
+
+**`implement-menu-gen`** is created off `plan-and-spec-web-app` once the design and plan are merged. It is the **destination branch for every task PR**. It is never committed to directly. When all implementation tasks have merged into it, `implement-menu-gen` itself is PR'd into `develop`, then `develop` is deployed to `main` per `npm run deploy`.
+
+**Per-task branch lifecycle:**
+
+1. **Cut a branch:** the owning agent runs `git fetch && git checkout -b task/NN-<name> origin/implement-menu-gen`. The branch name embeds the plan task number (zero-padded, two digits) and a short slug.
+2. **Work and commit** on that branch only. Multiple small commits are acceptable; the PR will be squash-merged (see merge policy below).
+3. **Push and open PR:** `git push -u origin task/NN-<name>` then `gh pr create --base implement-menu-gen --title "Task NN: <name>" --body "<body>"`. The PR body includes:
+   - Link to the plan task anchor (`docs/superpowers/plans/2026-05-11-menu-generator.md#task-NN-...`).
+   - Link to any Allium spec the task touches.
+   - "Closes Project item: `PVTI_...`" so the Project board can backlink.
+   - Test output (one tail of `npm run test:run`) and lint status.
+4. **Move Project item to `In review`** at PR open.
+5. **Reviews run:** the controller dispatches `code-health` and (if any Allium spec is touched) `allium:weed` against the PR. Findings post as PR review comments. The owning agent fixes; reviewers re-run. Loop until both approve.
+6. **Merge:** the merging agent runs `gh pr merge <num> --squash --delete-branch`. **Squash merge** is mandatory so `implement-menu-gen` history is one-commit-per-task.
+7. **Move Project item to `Done`** post-merge.
+
+**No agent skips this flow.** Tasks completed locally without a merged PR are **not done**, regardless of how clean the commit is.
+
+**Reviewer dispatch responsibilities:**
+
+| Reviewer | Required on | Looks for | Approval signal |
+|---|---|---|---|
+| `code-health` | Every PR | Tech debt, oversized files, weak tests, stale docs, redundant patterns, naming, clarity | ✅ comment with no Important / Critical findings |
+| `allium:weed` | PRs that touch `specs/*.allium` or any code referenced by a spec | Drift between Allium rules and the actual code or tests | ✅ comment "no drift" |
+
+**Block-until-merged enforcement:** the controller MUST NOT dispatch the next task's implementer until the prior task's PR is merged and `implement-menu-gen` is updated locally. Two consequences:
+
+- No stacked PRs in this project. One open PR at a time targeting `implement-menu-gen`.
+- If a PR's review loop stalls (reviewer keeps flagging the same issue), the controller pauses and asks the human before forcing through.
+
+**Merge policy summary:**
+
+- Squash merge, delete branch after merge.
+- Commit message on `implement-menu-gen` is the PR title (`Task NN: <name>`), keeping the integration branch's log readable as a task ledger.
+- No force-pushes to `implement-menu-gen` or any upstream branch.
 
 ## 9. Documentation deliverables
 
