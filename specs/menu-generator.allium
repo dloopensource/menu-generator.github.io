@@ -1,0 +1,420 @@
+-- allium: 3
+-- Top-level umbrella spec for the Menu Generator application.
+-- Sub-specs (api-key, prompt-form, reference-photo, menu-generation,
+-- menu-card, generator-service) are defined in later tasks and referenced
+-- from this file via deferred declarations.
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+enum CardStatus { pending | generating | ready | error }
+
+enum GlobalStatus { idle | parsing | generating | partial | done | error }
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+entity MenuGeneratorApp {
+    -- Singleton representing the running application instance.
+    -- Holds no mutable fields at the app level; state is distributed
+    -- across ApiKey, Generation and MenuItem entities.
+}
+
+entity ApiKey {
+    -- The user-supplied Gemini API key, persisted across sessions.
+    value: String
+}
+
+entity Prompt {
+    -- Free-form text describing the desired menu items.
+    text: String
+}
+
+entity ReferencePhoto {
+    -- An image file uploaded by the user as the menu parse source.
+    -- Only PNG and JPEG are accepted.
+    file: String
+    mime_type: String
+}
+
+entity MenuItemRequest {
+    -- The bundle the user submits when clicking Generate menu.
+    count: Integer
+    prompt: Prompt?
+    reference_photo: ReferencePhoto?
+
+    invariant RequiresPromptOrPhoto {
+        prompt != null or reference_photo != null
+    }
+
+    invariant CountInBounds {
+        count >= 1 and count <= 8
+    }
+}
+
+entity MenuItem {
+    -- A single generated dish card within a Generation.
+    generation: Generation
+    category: String
+    name: String
+    description: String
+    price: String
+    image_url: String?
+    status: CardStatus
+
+    transitions status {
+        pending -> generating
+        generating -> ready
+        generating -> error
+        error -> generating
+        terminal: ready
+    }
+}
+
+entity Generation {
+    -- A single Generate-menu invocation. Fans out to one MenuItem per count.
+    global_status: GlobalStatus
+    items: MenuItem with generation = this
+
+    transitions global_status {
+        idle -> parsing
+        parsing -> generating
+        parsing -> error
+        generating -> partial
+        generating -> done
+        generating -> error
+        partial -> done
+        terminal: done, error
+    }
+
+    -- Derived: subset views of items by status
+    ready_items: items where status = ready
+    failed_items: items where status = error
+    pending_items: items where status = pending
+    generating_items: items where status = generating
+
+    invariant DoneWhenAllNonBlankReady {
+        global_status = done implies
+            items.all(i => i.status = ready or (i.name = "" and i.description = ""))
+    }
+
+    invariant PartialWhenSomeSucceedSomeFail {
+        global_status = partial implies
+            ready_items.count > 0 and failed_items.count > 0
+    }
+}
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    min_count: Integer = 1
+    max_count: Integer = 8
+    default_count: Integer = 4
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Flow: API key management
+
+rule PersistApiKey {
+    when: OnSetApiKey(key)
+    ensures: ApiKey.created(value: key)
+
+    @guidance
+        -- If an ApiKey already exists the implementation replaces it.
+        -- Persistence to localStorage is an implementation detail.
+}
+
+-- Flow: Generation start
+
+rule StartGeneration {
+    -- A generation can only start when an ApiKey is set OR ?fake=true is active.
+    -- The surface (PromptForm) guards the trigger; this rule expresses the
+    -- behavioural pre-condition.
+    when: OnGenerateMenu(request)
+    requires:
+        exists ApiKey or fake_mode_active(request)
+    requires:
+        request.count >= config.min_count
+        and request.count <= config.max_count
+    requires:
+        request.prompt != null or request.reference_photo != null
+    ensures:
+        Generation.created(global_status: parsing)
+}
+
+-- Flow: Parsing to per-item fan-out
+
+rule ParseComplete {
+    -- After parsing succeeds the generation moves to generating and
+    -- individual MenuItem entities are created (fan-out is deferred to
+    -- menu-generation.allium).
+    when: generation: Generation.global_status transitions_to parsing
+    requires: generation.global_status = parsing
+    ensures:
+        generation.global_status = generating
+
+    @guidance
+        -- One MenuItem is created per request.count. Items with a non-empty
+        -- name or description move immediately to generating; blank items
+        -- stay at pending (see BlankItemSkipsGeneration and NonBlankItemStartsGenerating).
+}
+
+rule ParseFailed {
+    when: generation: Generation.global_status transitions_to parsing
+    requires: generation.global_status = parsing
+    ensures:
+        generation.global_status = error
+}
+
+-- Flow: Global status resolution after per-item image generation
+
+rule AllItemsSucceeded {
+    -- Generation is done when no items remain in generating or error.
+    when: generation: Generation.global_status transitions_to generating
+    requires:
+        generation.global_status = generating
+        and generation.failed_items.count = 0
+        and generation.generating_items.count = 0
+    ensures:
+        generation.global_status = done
+}
+
+rule SomeItemsSucceeded {
+    -- Generation is partial when some items succeeded and some failed.
+    when: generation: Generation.global_status transitions_to generating
+    requires:
+        generation.global_status = generating
+        and generation.ready_items.count > 0
+        and generation.failed_items.count > 0
+        and generation.generating_items.count = 0
+    ensures:
+        generation.global_status = partial
+}
+
+rule AllItemsFailed {
+    -- Generation is error when all items failed.
+    when: generation: Generation.global_status transitions_to generating
+    requires:
+        generation.global_status = generating
+        and generation.ready_items.count = 0
+        and generation.failed_items.count > 0
+        and generation.generating_items.count = 0
+    ensures:
+        generation.global_status = error
+}
+
+rule PartialBecomesComplete {
+    -- Partial generation becomes done once the last remaining card succeeds.
+    when: generation: Generation.global_status transitions_to partial
+    requires:
+        generation.global_status = partial
+        and generation.generating_items.count = 0
+        and generation.failed_items.count = 0
+    ensures:
+        generation.global_status = done
+}
+
+-- Flow: Per-item image generation status transitions
+
+rule NonBlankItemStartsGenerating {
+    -- A newly created MenuItem with at least one of name or description
+    -- non-empty immediately begins image generation.
+    when: item: MenuItem.status becomes pending
+    requires: item.name != "" or item.description != ""
+    ensures:
+        item.status = generating
+}
+
+rule BlankItemSkipsGeneration {
+    -- A newly created MenuItem with both name and description empty stays
+    -- pending until user input triggers per-card regenerate.
+    when: item: MenuItem.status becomes pending
+    requires: item.name = "" and item.description = ""
+    ensures:
+        item.status = pending
+
+    @guidance
+        -- Blank cards render as editable cards in the grid. The user types
+        -- into the card and clicks ↻ to start image generation (OnRegenerateCard).
+}
+
+rule CardImageReady {
+    -- Image generation completed successfully for this card.
+    when: item: MenuItem.status transitions_to generating
+    requires: item.status = generating
+    ensures:
+        item.status = ready
+        item.image_url = generate_image_url(item)
+
+    @guidance
+        -- generate_image_url is a black box calling MenuGenerator.generateDishImage.
+        -- The returned value is a Blob object URL created by the browser.
+}
+
+rule CardImageFailed {
+    -- Image generation failed for this card.
+    when: item: MenuItem.status transitions_to generating
+    requires: item.status = generating
+    ensures:
+        item.status = error
+
+    @guidance
+        -- The card shows an error badge and an active ↻ button.
+        -- The user can click ↻ to retry (OnRegenerateCard).
+}
+
+-- Flow: Per-card regenerate
+
+rule RegenerateCard {
+    -- Regenerate the image for a single card. Siblings are not affected.
+    when: OnRegenerateCard(id)
+    ensures:
+        let item = MenuItem{id: id}
+        item.status = generating
+
+    @guidance
+        -- Only the targeted card's status transitions; all other cards in the
+        -- same Generation remain in their current status unchanged.
+        -- The implementation cancels any in-flight image request for this card
+        -- before starting a new one.
+}
+
+-- Flow: Inline card field editing
+
+rule EditCardField {
+    -- Update one field on one card. No other cards are affected.
+    when: OnEditCardField(id, field, value)
+    ensures:
+        let item = MenuItem{id: id}
+        update_card_field(item, field, value)
+
+    @guidance
+        -- update_card_field is a black box that sets the named field
+        -- (category, name, description, or price) on the targeted card.
+        -- If the card was pending/error and now has a non-empty name or
+        -- description, the user may click ↻ (OnRegenerateCard) to start
+        -- image generation.
+}
+
+-- Flow: Default count
+
+rule CountDefault {
+    when: OnGenerateMenu(request)
+    requires: request.count = null
+    ensures:
+        request.count = config.default_count
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant CountAlwaysInBounds {
+    for r in MenuItemRequests:
+        r.count >= config.min_count and r.count <= config.max_count
+}
+
+------------------------------------------------------------
+-- Actor Declarations
+------------------------------------------------------------
+
+actor AppUser {
+    identified_by: MenuGeneratorApp
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+surface ApiKeyGate {
+    -- Blocks all other surfaces until an ApiKey is set OR the ?fake=true
+    -- URL flag is active. In fake mode the gate is a pass-through no-op.
+    facing user: AppUser
+
+    provides:
+        OnSetApiKey(key)
+
+    @guidance
+        -- The gate renders the ApiKeyForm when no ApiKey exists and
+        -- fake_mode_active is false. Once either condition is satisfied,
+        -- the rest of the UI (PromptForm, MenuGrid) becomes available.
+        -- This surface is the sole entry point for API key provisioning.
+}
+
+surface PromptForm {
+    -- The input form: prompt textarea, reference photo dropzone,
+    -- count stepper, generate button, change-API-key link.
+    facing user: AppUser
+
+    provides:
+        OnGenerateMenu(request)
+        OnSetApiKey(key)
+
+    @guidance
+        -- The Generate button is disabled while a Generation's global_status
+        -- is parsing or generating.
+        -- count stepper is bounded to config.min_count..config.max_count.
+        -- The reference photo dropzone accepts image/png and image/jpeg only.
+        -- Presence of a reference photo suppresses text-prompt parsing (Flow B).
+        -- A small "Change API key" link at the bottom of the form provides
+        -- OnSetApiKey without navigating away.
+}
+
+surface MenuGrid {
+    -- The rendered grid of MenuItem cards. Each card shows the generated
+    -- image and the inline-editable text fields.
+    facing user: AppUser
+
+    context generation: Generation
+
+    exposes:
+        generation.global_status
+        for item in generation.items:
+            item.status
+            item.category
+            item.name
+            item.description
+            item.price
+            item.image_url
+
+    provides:
+        OnRegenerateCard(id)
+        OnEditCardField(id, field, value)
+
+    @guidance
+        -- Cards with status = pending (blank items) show editable text fields
+        -- and a disabled ↻ button until name or description is non-empty.
+        -- Cards with status = generating show a loading skeleton image.
+        -- Cards with status = error show an error badge and an active ↻ button.
+        -- Cards with status = ready show the generated image.
+        -- Only the targeted card is affected by OnRegenerateCard and
+        -- OnEditCardField; siblings retain their current status.
+}
+
+------------------------------------------------------------
+-- Deferred Specifications
+------------------------------------------------------------
+
+deferred ApiKeySpec.manage       -- see: specs/api-key.allium
+deferred PromptFormSpec.validate -- see: specs/prompt-form.allium
+deferred ReferencePhotoSpec.handle -- see: specs/reference-photo.allium
+deferred MenuGenerationSpec.run  -- see: specs/menu-generation.allium
+deferred MenuCardSpec.edit       -- see: specs/menu-card.allium
+deferred GeneratorServiceSpec.call -- see: specs/generator-service.allium
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "fake_mode_active — fake_mode_active(request) is used as a black box reading the ?fake=true URL flag. Should it be modelled as a derived value on MenuGeneratorApp or remain a black box function?"
+open question "ReferencePhoto mime_type validation — should the spec reject files whose MIME type does not match image/png or image/jpeg at the surface boundary, or is this enforced by the dropzone implementation?"
+open question "ApiKey uniqueness — can multiple ApiKey entities coexist (one per browser tab), or is there a singleton invariant? The localStorage key is shared so concurrent tabs would overwrite each other."
+open question "Generation history — are past Generation entities retained or replaced on each OnGenerateMenu invocation? If retained, MenuGrid must scope to the most recent Generation."
+open question "count field on MenuItemRequest — can it be changed after request creation (e.g. stepper interaction mid-generation), or is it immutable once OnGenerateMenu fires?"
