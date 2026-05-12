@@ -54,6 +54,15 @@ entity MenuItemRequest {
     }
 }
 
+entity ParsedMenuItem {
+    -- A single menu item returned by the parser / generator service.
+    -- Full definition is deferred to generator-service.allium.
+    category: String
+    name: String
+    description: String
+    price: String
+}
+
 entity MenuItem {
     -- A single generated dish card within a Generation.
     generation: Generation
@@ -76,6 +85,7 @@ entity MenuItem {
 entity Generation {
     -- A single Generate-menu invocation. Fans out to one MenuItem per count.
     global_status: GlobalStatus
+    error_message: String?
     items: MenuItem with generation = this
 
     transitions global_status {
@@ -131,12 +141,24 @@ rule PersistApiKey {
         -- Persistence to localStorage is an implementation detail.
 }
 
+-- Flow: Initial generation state (D2: establishes idle as the starting state)
+
+rule InitialGenerationState {
+    -- When the application first mounts, a Generation entity is created at
+    -- idle to represent the quiescent state before any user action.
+    -- This witnesses the idle entry point declared in the transition graph.
+    when: _: MenuGeneratorApp.created
+    ensures:
+        Generation.created(global_status: idle)
+}
+
 -- Flow: Generation start
 
 rule StartGeneration {
     -- A generation can only start when an ApiKey is set OR ?fake=true is active.
     -- The surface (PromptForm) guards the trigger; this rule expresses the
     -- behavioural pre-condition.
+    -- D1: request is typed as MenuItemRequest via the surface's provides: clause.
     when: OnGenerateMenu(request)
     requires:
         exists ApiKey or fake_mode_active(request)
@@ -147,15 +169,24 @@ rule StartGeneration {
         request.prompt != null or request.reference_photo != null
     ensures:
         Generation.created(global_status: parsing)
+
+    @guidance
+        -- The idle -> parsing transition is the only declared outbound edge from
+        -- idle. Creating a new Generation at parsing on each invocation satisfies
+        -- the graph without requiring a mutable singleton pattern at this spec
+        -- level. The InitialGenerationState rule introduces idle; this rule
+        -- introduces parsing on new invocations.
 }
 
 -- Flow: Parsing to per-item fan-out
+-- D4: ParseComplete and ParseFailed now bind to distinct named triggers so that
+-- success and failure paths are unambiguous.
 
 rule ParseComplete {
-    -- After parsing succeeds the generation moves to generating and
-    -- individual MenuItem entities are created (fan-out is deferred to
-    -- menu-generation.allium).
-    when: generation: Generation.global_status transitions_to parsing
+    -- After the generator service signals successful parsing, the generation
+    -- moves to generating and individual MenuItem entities are created
+    -- (fan-out is deferred to menu-generation.allium).
+    when: OnParseSucceeded(generation, items: List<ParsedMenuItem>)
     requires: generation.global_status = parsing
     ensures:
         generation.global_status = generating
@@ -163,14 +194,19 @@ rule ParseComplete {
     @guidance
         -- One MenuItem is created per request.count. Items with a non-empty
         -- name or description move immediately to generating; blank items
-        -- stay at pending (see BlankItemSkipsGeneration and NonBlankItemStartsGenerating).
+        -- stay at pending (see NonBlankItemStartsGenerating).
+        -- The full fan-out logic (binding items to MenuItems) is specified
+        -- in menu-generation.allium.
 }
 
 rule ParseFailed {
-    when: generation: Generation.global_status transitions_to parsing
+    -- After the generator service signals a parse failure, the generation
+    -- moves to error and the error message is recorded.
+    when: OnParseFailed(generation, message: String)
     requires: generation.global_status = parsing
     ensures:
         generation.global_status = error
+        generation.error_message = message
 }
 
 -- Flow: Global status resolution after per-item image generation
@@ -232,18 +268,10 @@ rule NonBlankItemStartsGenerating {
         item.status = generating
 }
 
-rule BlankItemSkipsGeneration {
-    -- A newly created MenuItem with both name and description empty stays
-    -- pending until user input triggers per-card regenerate.
-    when: item: MenuItem.status becomes pending
-    requires: item.name = "" and item.description = ""
-    ensures:
-        item.status = pending
-
-    @guidance
-        -- Blank cards render as editable cards in the grid. The user types
-        -- into the card and clicks ↻ to start image generation (OnRegenerateCard).
-}
+-- Items where both name and description are empty stay at pending; no rule fires
+-- to advance them. Blank cards render as editable cards. The user types into
+-- the card and clicks ↻ (OnRegenerateCard) to start image generation.
+-- Guard on the image-generation trigger is deferred to menu-card.allium.
 
 rule CardImageReady {
     -- Image generation completed successfully for this card.
@@ -303,14 +331,7 @@ rule EditCardField {
         -- image generation.
 }
 
--- Flow: Default count
-
-rule CountDefault {
-    when: OnGenerateMenu(request)
-    requires: request.count = null
-    ensures:
-        request.count = config.default_count
-}
+-- count default value is owned by prompt-form.allium (stepper component default).
 
 ------------------------------------------------------------
 -- Invariants
@@ -326,6 +347,12 @@ invariant CountAlwaysInBounds {
 ------------------------------------------------------------
 
 actor AppUser {
+    identified_by: MenuGeneratorApp
+}
+
+actor GeneratorService {
+    -- The background generator/parser service that signals parse outcomes.
+    -- Full definition is deferred to generator-service.allium.
     identified_by: MenuGeneratorApp
 }
 
@@ -354,7 +381,7 @@ surface PromptForm {
     facing user: AppUser
 
     provides:
-        OnGenerateMenu(request)
+        OnGenerateMenu(request: MenuItemRequest)
         OnSetApiKey(key)
 
     @guidance
@@ -396,6 +423,24 @@ surface MenuGrid {
         -- Cards with status = ready show the generated image.
         -- Only the targeted card is affected by OnRegenerateCard and
         -- OnEditCardField; siblings retain their current status.
+}
+
+surface GeneratorServiceCallbacks {
+    -- Entry point for internal events emitted by the parser / generator service.
+    -- These are not user actions; they are callbacks from the background service
+    -- after a parse attempt completes.
+    facing service: GeneratorService
+
+    context generation: Generation
+
+    provides:
+        OnParseSucceeded(generation, items: List<ParsedMenuItem>)
+        OnParseFailed(generation, message: String)
+
+    @guidance
+        -- Full trigger semantics and the service-side contract are specified
+        -- in generator-service.allium. This surface declares the entry points
+        -- so that ParseComplete and ParseFailed rules have a reachable trigger.
 }
 
 ------------------------------------------------------------
