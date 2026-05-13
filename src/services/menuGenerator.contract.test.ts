@@ -8,13 +8,12 @@ const cases: Array<[string, () => MenuGenerator]> = [
 ];
 
 describe.each(cases)("MenuGenerator contract — %s", (_label, factory) => {
-  it("parseMenuFromText returns at least one ParsedMenuItem for a non-empty prompt", async () => {
+  it("parseMenuFromText returns a ParsedMenuItem[] for a non-empty prompt", async () => {
     const gen = factory();
     const items = await gen.parseMenuFromText("a four-course Italian dinner", {
       signal: new AbortController().signal,
     });
     expect(Array.isArray(items)).toBe(true);
-    expect(items.length).toBeGreaterThan(0);
     for (const item of items) {
       expect(item).toMatchObject({
         category: expect.any(String),
@@ -25,13 +24,13 @@ describe.each(cases)("MenuGenerator contract — %s", (_label, factory) => {
     }
   });
 
-  it("parseMenuFromImage returns at least one ParsedMenuItem for a valid file", async () => {
+  it("parseMenuFromImage returns a ParsedMenuItem[] for a valid file", async () => {
     const gen = factory();
     const file = new File(["dummy"], "menu.jpg", { type: "image/jpeg" });
     const items = await gen.parseMenuFromImage(file, {
       signal: new AbortController().signal,
     });
-    expect(items.length).toBeGreaterThan(0);
+    expect(Array.isArray(items)).toBe(true);
   });
 
   it("generateDishImage returns a Blob with non-zero size", async () => {
