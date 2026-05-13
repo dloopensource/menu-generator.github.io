@@ -17,3 +17,14 @@ if (typeof URL.createObjectURL === "undefined") {
     writable: true,
   });
 }
+
+const OriginalBlob = globalThis.Blob;
+Object.defineProperty(globalThis, "Blob", {
+  value: class Blob extends OriginalBlob {
+    static [Symbol.hasInstance](obj: unknown) {
+      return obj instanceof OriginalBlob ||
+        (obj && Object.prototype.toString.call(obj) === "[object Blob]");
+    }
+  },
+  writable: true,
+});
