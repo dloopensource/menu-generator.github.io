@@ -214,9 +214,21 @@ const generator = useMemo(
 
 `<ApiKeyGate>` blocks rendering only when **not** in fake mode, so `?fake=true` boots straight into the UI for demos.
 
-### 4.4 SDK assumptions to verify
+### 4.4 SDK shape — verified
 
-The `@google/genai` SDK shape — especially the structured-output API and the response shape for image parts from `gemini-2.5-flash-image` — must be verified with `ctx7` before the implementation plan is finalized. Recent SDK versions have changed both, and getting them wrong is the most likely source of churn.
+The `@google/genai` SDK shape was verified against version **2.0.1** via the installed `.d.ts` and a live probe (2026-05-13). Findings:
+
+- **Client construction:** `new GoogleGenAI({ apiKey })`; call `ai.models.generateContent({ model, contents, config })`.
+- **Parse response (text model, `responseMimeType: "application/json"` + `responseSchema`):** the JSON arrives as `response.candidates[0].content.parts[0].text` (a string), and the SDK also exposes a convenience getter `response.text` that concatenates all text parts of the first candidate. Use the getter — it's cleaner and the contract is the same.
+- **Image response (`gemini-2.5-flash-image` with `responseModalities: ["IMAGE"]`):** the image bytes arrive as `response.candidates[0].content.parts[0].inlineData = { mimeType: "image/png", data: <base64 string> }`. Decode base64 → `Uint8Array` → `Blob`.
+- **Success finishReason:** `"STOP"` (a string literal, not the `FinishReason` enum class member).
+- **Content-blocked finishReason values (image model):** `"IMAGE_SAFETY"`, `"IMAGE_PROHIBITED_CONTENT"`, `"IMAGE_RECITATION"`, `"IMAGE_OTHER"`, `"NO_IMAGE"`. (Text model: `"SAFETY"`, `"PROHIBITED_CONTENT"`, `"BLOCKLIST"`, `"SPII"`.) **There is no `"BLOCKED"` value** in v2.x — earlier drafts of this doc and the plan assumed there was; that was incorrect.
+- **Errors:** the SDK throws an `ApiError` object with `name: "ApiError"`, `status: <int>`, and `message: <stringified JSON body>`.
+  - Invalid key: `status: 400`, body contains `"reason":"API_KEY_INVALID"` and `"status":"INVALID_ARGUMENT"`. Map to `GeneratorError("invalid_key", ...)`.
+  - Rate-limited: `status: 429`, body contains `"status":"RESOURCE_EXHAUSTED"`. Map to `rate_limited`.
+  - Other 4xx / 5xx / `TypeError`: map to `network` (for `TypeError`) or `unknown`.
+
+**Critical product caveat:** the Gemini **free tier returns `429 RESOURCE_EXHAUSTED` for `gemini-2.5-flash-image` with `limit: 0`** — image generation requires a Google Cloud project with billing enabled. The app's `rate_limited` error message should surface this so users on a free-tier key understand why every generation fails. Document the requirement in the README and in the in-app error banner copy.
 
 ## 5. Allium specifications
 
@@ -630,8 +642,14 @@ sequenceDiagram
 
 ## 10. Open items deferred to the implementation plan
 
-- Resolve exact `@google/genai` SDK version + structured-output API + image response shape via `ctx7`.
-- Pin RTL / jsdom / user-event versions compatible with React 19 and Vitest 4 via `ctx7`.
-- Confirm Vite-on-React-19 `vitest` config minimum (`environment`, `setupFiles`, `globals`, `css.modules` mapping).
-- Decide a default `styleHint` string for `generateDishImage` to keep generated images visually coherent across cards.
+Resolved by Task 1 (test harness PR #1) and Task 4 + live probe (2026-05-13):
+
+- ~~Resolve exact `@google/genai` SDK version + structured-output API + image response shape~~ — verified at v2.0.1, see §4.4.
+- ~~Pin RTL / jsdom / user-event versions~~ — RTL ^16, user-event ^14, jest-dom ^6, jsdom ^28 (the requested ^17 / ^15 / ^7 majors don't exist on npm).
+- ~~Confirm Vite-on-React-19 `vitest` config minimum~~ — verified working in `vitest.config.ts`.
+
+Still open:
+
+- Decide a default `styleHint` string for `generateDishImage` to keep generated images visually coherent across cards. Suggest: `"A warm, naturally lit overhead food photograph on a neutral surface, shallow depth of field, restaurant-magazine quality. No text overlay."` — adopt in Task 6 unless tweaked.
 - Choose the four static suggestion-chip labels (mockup shows: "Italian tasting menu", "Sunday brunch", "Cocktail flight", "Trattoria dinner" — adopt as-is unless changed during implementation).
+- README must document the **paid-tier billing requirement** for image generation (see §4.4). To file as a follow-up infra task.

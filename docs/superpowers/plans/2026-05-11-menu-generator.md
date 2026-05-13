@@ -890,8 +890,22 @@ beforeEach(() => {
 });
 
 describe("geminiMenuGenerator error mapping", () => {
-  it("maps 401/403 SDK errors to GeneratorError(invalid_key)", async () => {
-    generateContent.mockRejectedValueOnce({ status: 401, message: "Bad key" });
+  // Per live probe (2026-05-13): the @google/genai SDK throws an ApiError with
+  // `status: 400` and a JSON-stringified message body for invalid keys. The body
+  // contains `"reason":"API_KEY_INVALID"` and `"status":"INVALID_ARGUMENT"`.
+  it("maps API_KEY_INVALID (status 400) SDK errors to GeneratorError(invalid_key)", async () => {
+    generateContent.mockRejectedValueOnce({
+      name: "ApiError",
+      status: 400,
+      message: JSON.stringify({
+        error: {
+          code: 400,
+          message: "API key not valid. Please pass a valid API key.",
+          status: "INVALID_ARGUMENT",
+          details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "API_KEY_INVALID" }],
+        },
+      }),
+    });
     const gen = geminiMenuGenerator("test-key");
     await expect(
       gen.parseMenuFromText("x", { signal: new AbortController().signal }),
@@ -901,17 +915,33 @@ describe("geminiMenuGenerator error mapping", () => {
     });
   });
 
-  it("maps 429 to GeneratorError(rate_limited)", async () => {
-    generateContent.mockRejectedValueOnce({ status: 429, message: "Slow down" });
+  it("maps 429 RESOURCE_EXHAUSTED to GeneratorError(rate_limited)", async () => {
+    generateContent.mockRejectedValueOnce({
+      name: "ApiError",
+      status: 429,
+      message: JSON.stringify({
+        error: { code: 429, message: "You exceeded your current quota.", status: "RESOURCE_EXHAUSTED" },
+      }),
+    });
     const gen = geminiMenuGenerator("test-key");
     await expect(
       gen.parseMenuFromText("x", { signal: new AbortController().signal }),
     ).rejects.toMatchObject({ kind: "rate_limited" });
   });
 
-  it("maps a 'BLOCKED' finish reason on the image model to content_blocked", async () => {
+  // Per the v2.0.1 FinishReason enum there is NO "BLOCKED" value. Image-side
+  // safety/recitation/prohibited content surfaces as one of:
+  //   IMAGE_SAFETY, IMAGE_PROHIBITED_CONTENT, IMAGE_RECITATION, IMAGE_OTHER, NO_IMAGE
+  // The implementation must map any of these to content_blocked.
+  it.each([
+    "IMAGE_SAFETY",
+    "IMAGE_PROHIBITED_CONTENT",
+    "IMAGE_RECITATION",
+    "IMAGE_OTHER",
+    "NO_IMAGE",
+  ])("maps finishReason %s on the image model to content_blocked", async (reason) => {
     generateContent.mockResolvedValueOnce({
-      candidates: [{ finishReason: "BLOCKED", content: { parts: [] } }],
+      candidates: [{ finishReason: reason, content: { parts: [] } }],
     });
     const gen = geminiMenuGenerator("test-key");
     await expect(
@@ -1035,15 +1065,51 @@ const PARSE_RESPONSE_SCHEMA = {
   },
 };
 
+// Per live probe (2026-05-13): the @google/genai SDK throws `ApiError` with
+// `status: <int>` and `message: <JSON-stringified body>`. The body has either
+// `"reason":"API_KEY_INVALID"` for bad keys (status 400) or
+// `"status":"RESOURCE_EXHAUSTED"` for quota (status 429). Match against the
+// stringified message so we don't have to re-parse the JSON.
 function mapError(err: unknown): GeneratorError {
   if (err instanceof GeneratorError) return err;
   const e = err as { status?: number; message?: string };
+  const msg = e?.message ?? "";
   let kind: GeneratorErrorKind = "unknown";
-  if (e?.status === 401 || e?.status === 403) kind = "invalid_key";
-  else if (e?.status === 429) kind = "rate_limited";
-  else if (e instanceof TypeError) kind = "network";
-  return new GeneratorError(kind, e?.message ?? "Unknown error");
+
+  if (e?.status === 400 && /API_KEY_INVALID|api key not valid/i.test(msg)) {
+    kind = "invalid_key";
+  } else if (e?.status === 401 || e?.status === 403) {
+    // Defensive: handle legacy 401/403 in case the API changes.
+    kind = "invalid_key";
+  } else if (e?.status === 429) {
+    kind = "rate_limited";
+  } else if (err instanceof TypeError) {
+    kind = "network";
+  }
+
+  // Friendlier message for rate-limit on the image model — free-tier projects
+  // hit this immediately because image generation requires billing.
+  const userMessage =
+    kind === "rate_limited"
+      ? "Gemini quota exceeded. Image generation requires a Google Cloud project with billing enabled."
+      : msg || "Unknown error";
+
+  return new GeneratorError(kind, userMessage);
 }
+
+const CONTENT_BLOCKED_FINISH_REASONS = new Set([
+  // Image model
+  "IMAGE_SAFETY",
+  "IMAGE_PROHIBITED_CONTENT",
+  "IMAGE_RECITATION",
+  "IMAGE_OTHER",
+  "NO_IMAGE",
+  // Text model (shouldn't trigger from generateDishImage but defensive)
+  "SAFETY",
+  "PROHIBITED_CONTENT",
+  "BLOCKLIST",
+  "SPII",
+]);
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
@@ -1074,7 +1140,9 @@ export function geminiMenuGenerator(apiKey: string): MenuGenerator {
           responseSchema: PARSE_RESPONSE_SCHEMA,
         },
       });
-      const text = response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      // SDK v2.x exposes `response.text` getter that concatenates all text
+      // parts of the first candidate. Verified against probe (2026-05-13).
+      const text = response?.text ?? response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
       if (!text) return [];
       const parsed = JSON.parse(text) as ParsedMenuItem[];
       return Array.isArray(parsed) ? parsed : [];
@@ -1117,8 +1185,12 @@ export function geminiMenuGenerator(apiKey: string): MenuGenerator {
           config: { responseModalities: ["IMAGE"] },
         });
         const candidate = response?.candidates?.[0];
-        if (candidate?.finishReason === "BLOCKED") {
-          throw new GeneratorError("content_blocked", "Image was blocked by safety filters.");
+        const finishReason = candidate?.finishReason;
+        if (finishReason && CONTENT_BLOCKED_FINISH_REASONS.has(finishReason)) {
+          throw new GeneratorError(
+            "content_blocked",
+            `Image was blocked (finishReason=${finishReason}).`,
+          );
         }
         const part = candidate?.content?.parts?.find(
           (p: unknown) => (p as { inlineData?: unknown }).inlineData,
@@ -1141,7 +1213,7 @@ function abortError(): Error {
 }
 ```
 
-> **Note on SDK shape:** the spec calls this out as an open item (§10). If the live SDK rejects this exact request shape (`ai.models.generateContent({ model, contents, config })`), update both the call and the test mocks together. Do **not** widen the test to accept any shape — keep the mock and the impl in lockstep.
+> **SDK shape — verified.** The `ai.models.generateContent({ model, contents, config })` request shape and the response shape (`candidates[0].content.parts[0].inlineData.{mimeType, data}` for images, `response.text` getter for parsed JSON) were verified against `@google/genai@2.0.1` via the installed `.d.ts` and a live probe on 2026-05-13. Findings are documented in design doc §4.4. If the SDK is bumped, re-run the probe (`/tmp/gemini-key.env` workflow) before assuming any of this is still accurate.
 
 - [ ] **Step 6: Run the test, confirm pass**
 
