@@ -20,7 +20,7 @@ describe("PromptForm", () => {
     const user = userEvent.setup();
     render(<PromptForm count={4} onCountChange={() => {}} onGenerate={() => {}} isGenerating={false} />);
     await user.click(screen.getByRole("button", { name: /italian tasting menu/i }));
-    expect(screen.getByLabelText(/describe today's menu/i)).toHaveValue(expect.stringMatching(/italian/i));
+    expect(screen.getByLabelText(/describe today's menu/i)).toHaveDisplayValue(/italian/i);
   });
 
   it("calls onGenerate with the assembled request", async () => {
