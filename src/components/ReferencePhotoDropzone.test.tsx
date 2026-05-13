@@ -38,7 +38,7 @@ describe("ReferencePhotoDropzone", () => {
   });
 
   it("rejects unsupported MIME types and calls onFileChange with null", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ applyAccept: false });
     const onChange = vi.fn();
     render(<ReferencePhotoDropzone file={null} onFileChange={onChange} />);
     const input = screen.getByLabelText(/browse/i) as HTMLInputElement;
