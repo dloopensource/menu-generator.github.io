@@ -100,19 +100,8 @@ function abortError(): Error {
   return e;
 }
 
-// Vitest's vi.fn().mockImplementation(arrowFn) cannot be invoked with `new`
-// (Reflect.construct requires a real constructor). Calling without `new` first
-// lets the test mock work; the real SDK throws, so we re-try with `new`.
-function createGenAI(apiKey: string) {
-  try {
-    return (GoogleGenAI as unknown as (o: { apiKey: string }) => InstanceType<typeof GoogleGenAI>)({ apiKey });
-  } catch {
-    return new GoogleGenAI({ apiKey });
-  }
-}
-
 export function geminiMenuGenerator(apiKey: string): MenuGenerator {
-  const ai = createGenAI(apiKey);
+  const ai = new GoogleGenAI({ apiKey });
 
   async function parseFromParts(parts: Part[], signal: AbortSignal) {
     if (signal.aborted) throw abortError();
