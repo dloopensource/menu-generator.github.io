@@ -38,4 +38,13 @@ describe("useApiKey", () => {
     act(() => result.current.setApiKey("   abc   "));
     expect(result.current.apiKey).toBe("abc");
   });
+
+  it("treats whitespace-only setApiKey as a clear (does not persist empty string)", () => {
+    window.localStorage.setItem(API_KEY_STORAGE_KEY, "previous-key");
+    const { result } = renderHook(() => useApiKey());
+    expect(result.current.apiKey).toBe("previous-key");
+    act(() => result.current.setApiKey("   "));
+    expect(result.current.apiKey).toBeNull();
+    expect(window.localStorage.getItem(API_KEY_STORAGE_KEY)).toBeNull();
+  });
 });
