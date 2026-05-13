@@ -17,9 +17,7 @@ export function MenuGeneratorProvider({
 export function useGenerator(): MenuGenerator {
   const gen = useContext(Ctx);
   if (!gen) {
-    throw new Error(
-      "useGenerator must be used inside <MenuGeneratorProvider>",
-    );
+    throw new Error("useGenerator must be used inside <MenuGeneratorProvider>");
   }
   return gen;
 }

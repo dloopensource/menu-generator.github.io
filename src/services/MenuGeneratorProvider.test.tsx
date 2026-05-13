@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import {
-  MenuGeneratorProvider,
-  useGenerator,
-} from "./MenuGeneratorProvider";
+import { MenuGeneratorProvider, useGenerator } from "./MenuGeneratorProvider";
 import type { MenuGenerator } from "./menuGenerator";
 
 function Probe() {

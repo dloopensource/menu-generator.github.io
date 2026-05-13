@@ -62,7 +62,10 @@ export function menuReducer(state: MenuState, action: MenuAction): MenuState {
         description: item.description,
         price: item.price,
         imageUrl: null,
-        status: item.name === "" && item.description === "" ? "pending" : "generating",
+        status:
+          item.name === "" && item.description === ""
+            ? "pending"
+            : "generating",
       }));
       return { ...state, cards, globalStatus: "generating" };
     }

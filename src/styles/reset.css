@@ -1,5 +1,13 @@
-*, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
 body {
   background: var(--color-bg);
   color: var(--color-ink);
@@ -8,6 +16,16 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
-button { font: inherit; cursor: pointer; }
-img { display: block; max-width: 100%; }
-input, textarea { font: inherit; color: inherit; }
+button {
+  font: inherit;
+  cursor: pointer;
+}
+img {
+  display: block;
+  max-width: 100%;
+}
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}

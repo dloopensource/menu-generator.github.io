@@ -95,7 +95,7 @@ menu-generator.github.io/
   - The **owning agent** fixes any issue raised by either reviewer before the PR can merge. Reviewers do not push fixes themselves.
 - **Merge policy:** squash merge (`gh pr merge <num> --squash --delete-branch`). Squash commit title = PR title (`Task NN: <name>`), so `implement-menu-gen`'s log reads as a task ledger.
 - **Project task lifecycle (per spec §8):** every task starts by creating a GitHub Project task in `Backlog`, self-assigning it, moving to `Ready` → `In progress` at branch cut. PR open ⇒ `In review`. PR merged ⇒ `Done`. **Local commits without a merged PR do not move the item past `In review`.** Owner mapping is in the task header.
-- **TDD:** write failing test → run and confirm it fails *for the right reason* → write minimal implementation → run test green → commit.
+- **TDD:** write failing test → run and confirm it fails _for the right reason_ → write minimal implementation → run test green → commit.
 - **`npm test` defaults to watch.** Use `npm run test:run` for one-shot CI-like runs. New tasks should run the specific spec via `npm run test:run -- path/to/file.test.ts`.
 - **Commit style** matches existing repo: short imperative, lowercase, no scope. Example: `add MenuGenerator service interface and fake impl`. Co-authored-by trailer optional. Squash-merge replaces these per-commit messages with the PR title on `implement-menu-gen`; original commits remain visible in the closed PR.
 - **Allium commands:** `allium check specs/<file>.allium` validates a spec. `allium analyse specs/<file>.allium` reports coverage. `allium:propagate` (skill) emits test skeletons. `allium:weed` (skill) reports spec ↔ code drift.
@@ -128,6 +128,7 @@ menu-generator.github.io/
 **Project task:** `Infra: test harness`
 **Owner(s):** `frontend-engineer` (deps + config) + `test-engineer` (smoke test)
 **Files:**
+
 - Modify: `package.json`
 - Create: `vitest.config.ts`
 - Create: `src/__tests__/setup.ts`
@@ -279,6 +280,7 @@ PR title: `Infra: test harness`. PR body links the design doc §8.4 anchor. Afte
 **Project task:** `Infra: design tokens`
 **Owner:** `frontend-engineer` (no test task — visual diff against `designs/photo-realistic-menu-generator.png` is the acceptance)
 **Files:**
+
 - Create: `src/styles/tokens.css`
 - Create: `src/styles/reset.css`
 - Modify: `src/index.css`
@@ -348,7 +350,8 @@ Create `src/styles/tokens.css`:
   --radius-pill: 999px;
 
   /* Shadows */
-  --shadow-card: 0 1px 2px rgba(29, 26, 22, 0.06), 0 8px 24px rgba(29, 26, 22, 0.05);
+  --shadow-card:
+    0 1px 2px rgba(29, 26, 22, 0.06), 0 8px 24px rgba(29, 26, 22, 0.05);
 }
 ```
 
@@ -357,8 +360,16 @@ Create `src/styles/tokens.css`:
 Create `src/styles/reset.css`:
 
 ```css
-*, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
 body {
   background: var(--color-bg);
   color: var(--color-ink);
@@ -367,9 +378,19 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
-button { font: inherit; cursor: pointer; }
-img { display: block; max-width: 100%; }
-input, textarea { font: inherit; color: inherit; }
+button {
+  font: inherit;
+  cursor: pointer;
+}
+img {
+  display: block;
+  max-width: 100%;
+}
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
 ```
 
 - [ ] **Step 5: Replace src/index.css**
@@ -413,6 +434,7 @@ git commit -m "add design tokens and reset for menu generator"
 **Owner:** `allium:tend`
 **Blocks:** every other `Spec:` and `Implement:` task — this is the umbrella spec.
 **Files:**
+
 - Create: `specs/menu-generator.allium`
 - Create: `docs/diagrams/sequence-flow-a-text.md`
 - Create: `docs/diagrams/sequence-flow-b-upload.md`
@@ -463,11 +485,11 @@ with a text prompt and no reference photo.
 
 \`\`\`mermaid
 sequenceDiagram
-    actor User
-    participant App as Menu Generator (browser)
-    participant Svc as MenuGenerator service
-    participant Gemini as Gemini API
-    ...
+actor User
+participant App as Menu Generator (browser)
+participant Svc as MenuGenerator service
+participant Gemini as Gemini API
+...
 \`\`\`
 
 ## Participants
@@ -519,6 +541,7 @@ PR title: `Spec: menu-generator`. After merge, set Project task to `Done`.
 **Owner:** `allium:tend` for the `.allium`; `frontend-engineer` for the `.ts`. Create **two** linked sub-tasks if you want strict separation; otherwise one combined task is acceptable for this thin file.
 **Blocks:** Tasks 5, 6, 7, every component test that consumes the generator.
 **Files:**
+
 - Create: `specs/generator-service.allium`
 - Create: `src/services/menuGenerator.ts`
 
@@ -631,6 +654,7 @@ git commit -m "add MenuGenerator interface, types and GeneratorError"
 **Owners:** `test-engineer` for the tests file; `frontend-engineer` for the impl.
 **Blocked by:** Task 4 (Spec).
 **Files:**
+
 - Create: `src/services/menuGenerator.contract.test.ts` (covers both fake and real impls)
 - Create: `src/services/fakeMenuGenerator.ts`
 
@@ -748,19 +772,22 @@ const MOCKUP_ITEMS: ParsedMenuItem[] = [
   {
     category: "PASTA",
     name: "Rigatoni all'Amatriciana",
-    description: "Slow-stewed sun marzano, crisped guanciale, a whisper of chili.",
+    description:
+      "Slow-stewed sun marzano, crisped guanciale, a whisper of chili.",
     price: "$25",
   },
   {
     category: "MAIN",
     name: "Branzino in Cartoccio",
-    description: "Whole branzino baked in parchment, fennel, taggiasche olives.",
+    description:
+      "Whole branzino baked in parchment, fennel, taggiasche olives.",
     price: "$38",
   },
   {
     category: "ANTIPASTO",
     name: "Burrata di Andria",
-    description: "Fior-di-latte cream, late-summer tomato, basil oil, sourdough.",
+    description:
+      "Fior-di-latte cream, late-summer tomato, basil oil, sourdough.",
     price: "$18",
   },
   {
@@ -853,6 +880,7 @@ Merge the tests PR and the impl PR together (or stack them). Walk both Project t
 **Owners:** `test-engineer` (tests) + `frontend-engineer` (impl).
 **Blocked by:** Task 5.
 **Files:**
+
 - Modify: `src/services/menuGenerator.contract.test.ts` — add the real-impl row to the parametrized table.
 - Create: `src/services/geminiMenuGenerator.test.ts` — tests for the SDK-specific error mapping (separate file because it owns its own `vi.mock`).
 - Create: `src/services/geminiMenuGenerator.ts`
@@ -883,7 +911,9 @@ vi.mock("@google/genai", () => {
 import { geminiMenuGenerator } from "./geminiMenuGenerator";
 // Access the mock fn via the namespace import:
 import * as Genai from "@google/genai";
-const generateContent = (Genai as unknown as { __generateContent: ReturnType<typeof vi.fn> }).__generateContent;
+const generateContent = (
+  Genai as unknown as { __generateContent: ReturnType<typeof vi.fn> }
+).__generateContent;
 
 beforeEach(() => {
   generateContent.mockReset();
@@ -902,7 +932,12 @@ describe("geminiMenuGenerator error mapping", () => {
           code: 400,
           message: "API key not valid. Please pass a valid API key.",
           status: "INVALID_ARGUMENT",
-          details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "API_KEY_INVALID" }],
+          details: [
+            {
+              "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+              reason: "API_KEY_INVALID",
+            },
+          ],
         },
       }),
     });
@@ -920,7 +955,11 @@ describe("geminiMenuGenerator error mapping", () => {
       name: "ApiError",
       status: 429,
       message: JSON.stringify({
-        error: { code: 429, message: "You exceeded your current quota.", status: "RESOURCE_EXHAUSTED" },
+        error: {
+          code: 429,
+          message: "You exceeded your current quota.",
+          status: "RESOURCE_EXHAUSTED",
+        },
       }),
     });
     const gen = geminiMenuGenerator("test-key");
@@ -939,18 +978,21 @@ describe("geminiMenuGenerator error mapping", () => {
     "IMAGE_RECITATION",
     "IMAGE_OTHER",
     "NO_IMAGE",
-  ])("maps finishReason %s on the image model to content_blocked", async (reason) => {
-    generateContent.mockResolvedValueOnce({
-      candidates: [{ finishReason: reason, content: { parts: [] } }],
-    });
-    const gen = geminiMenuGenerator("test-key");
-    await expect(
-      gen.generateDishImage(
-        { name: "X", description: "Y" },
-        { signal: new AbortController().signal },
-      ),
-    ).rejects.toMatchObject({ kind: "content_blocked" });
-  });
+  ])(
+    "maps finishReason %s on the image model to content_blocked",
+    async (reason) => {
+      generateContent.mockResolvedValueOnce({
+        candidates: [{ finishReason: reason, content: { parts: [] } }],
+      });
+      const gen = geminiMenuGenerator("test-key");
+      await expect(
+        gen.generateDishImage(
+          { name: "X", description: "Y" },
+          { signal: new AbortController().signal },
+        ),
+      ).rejects.toMatchObject({ kind: "content_blocked" });
+    },
+  );
 
   it("parses JSON from a successful text response", async () => {
     generateContent.mockResolvedValueOnce({
@@ -960,7 +1002,12 @@ describe("geminiMenuGenerator error mapping", () => {
             parts: [
               {
                 text: JSON.stringify([
-                  { category: "PASTA", name: "X", description: "Y", price: "$10" },
+                  {
+                    category: "PASTA",
+                    name: "X",
+                    description: "Y",
+                    price: "$10",
+                  },
                 ]),
               },
             ],
@@ -1115,7 +1162,8 @@ async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
   const bytes = new Uint8Array(buf);
   let bin = "";
-  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.byteLength; i++)
+    bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
 }
 
@@ -1142,7 +1190,10 @@ export function geminiMenuGenerator(apiKey: string): MenuGenerator {
       });
       // SDK v2.x exposes `response.text` getter that concatenates all text
       // parts of the first candidate. Verified against probe (2026-05-13).
-      const text = response?.text ?? response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      const text =
+        response?.text ??
+        response?.candidates?.[0]?.content?.parts?.[0]?.text ??
+        "";
       if (!text) return [];
       const parsed = JSON.parse(text) as ParsedMenuItem[];
       return Array.isArray(parsed) ? parsed : [];
@@ -1196,9 +1247,15 @@ export function geminiMenuGenerator(apiKey: string): MenuGenerator {
           (p: unknown) => (p as { inlineData?: unknown }).inlineData,
         ) as { inlineData?: { mimeType: string; data: string } } | undefined;
         if (!part?.inlineData?.data) {
-          throw new GeneratorError("unknown", "Image response contained no inline data.");
+          throw new GeneratorError(
+            "unknown",
+            "Image response contained no inline data.",
+          );
         }
-        return base64ToBlob(part.inlineData.data, part.inlineData.mimeType ?? "image/png");
+        return base64ToBlob(
+          part.inlineData.data,
+          part.inlineData.mimeType ?? "image/png",
+        );
       } catch (err) {
         throw mapError(err);
       }
@@ -1265,6 +1322,7 @@ Run the `allium:weed` skill against `specs/generator-service.allium` and `src/se
 **Owner:** `frontend-engineer` (with `test-engineer` for the small unit test).
 **Blocked by:** Task 6.
 **Files:**
+
 - Create: `src/services/MenuGeneratorProvider.tsx`
 - Create: `src/services/MenuGeneratorProvider.test.tsx`
 
@@ -1277,10 +1335,7 @@ Create `src/services/MenuGeneratorProvider.test.tsx`:
 ```tsx
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import {
-  MenuGeneratorProvider,
-  useGenerator,
-} from "./MenuGeneratorProvider";
+import { MenuGeneratorProvider, useGenerator } from "./MenuGeneratorProvider";
 
 function Probe() {
   const gen = useGenerator();
@@ -1339,9 +1394,7 @@ export function MenuGeneratorProvider({
 export function useGenerator(): MenuGenerator {
   const gen = useContext(Ctx);
   if (!gen) {
-    throw new Error(
-      "useGenerator must be used inside <MenuGeneratorProvider>",
-    );
+    throw new Error("useGenerator must be used inside <MenuGeneratorProvider>");
   }
   return gen;
 }
@@ -1372,6 +1425,7 @@ git commit -m "add MenuGeneratorProvider and useGenerator hook"
 **Owners:** `allium:tend` (spec), `test-engineer` (tests), `frontend-engineer` (impl).
 **Blocked by:** Task 4.
 **Files:**
+
 - Create: `specs/menu-generation.allium`
 - Create: `src/state/types.ts`
 - Create: `src/state/menuReducer.ts`
@@ -1434,7 +1488,12 @@ export type MenuAction =
   | { type: "startGeneration"; ids: string[] }
   | {
       type: "parseSucceeded";
-      items: { category: string; name: string; description: string; price: string }[];
+      items: {
+        category: string;
+        name: string;
+        description: string;
+        price: string;
+      }[];
     }
   | { type: "cardStarted"; id: string }
   | { type: "cardSucceeded"; id: string; imageUrl: string }
@@ -1467,11 +1526,17 @@ import { describe, it, expect } from "vitest";
 import { menuReducer } from "./menuReducer";
 import { initialMenuState, type MenuState, type MenuCard } from "./types";
 
-function withCards(overrides: Partial<MenuState>, cards: MenuCard[]): MenuState {
+function withCards(
+  overrides: Partial<MenuState>,
+  cards: MenuCard[],
+): MenuState {
   return { ...initialMenuState, ...overrides, cards };
 }
 
-function makeCard(id: string, status: MenuCard["status"] = "pending"): MenuCard {
+function makeCard(
+  id: string,
+  status: MenuCard["status"] = "pending",
+): MenuCard {
   return {
     id,
     category: "",
@@ -1485,14 +1550,23 @@ function makeCard(id: string, status: MenuCard["status"] = "pending"): MenuCard 
 
 describe("menuReducer", () => {
   it("setPrompt updates the prompt", () => {
-    const next = menuReducer(initialMenuState, { type: "setPrompt", value: "hi" });
+    const next = menuReducer(initialMenuState, {
+      type: "setPrompt",
+      value: "hi",
+    });
     expect(next.prompt).toBe("hi");
   });
 
   it("setCount clamps to [1, 8]", () => {
-    expect(menuReducer(initialMenuState, { type: "setCount", value: 0 }).count).toBe(1);
-    expect(menuReducer(initialMenuState, { type: "setCount", value: 99 }).count).toBe(8);
-    expect(menuReducer(initialMenuState, { type: "setCount", value: 4 }).count).toBe(4);
+    expect(
+      menuReducer(initialMenuState, { type: "setCount", value: 0 }).count,
+    ).toBe(1);
+    expect(
+      menuReducer(initialMenuState, { type: "setCount", value: 99 }).count,
+    ).toBe(8);
+    expect(
+      menuReducer(initialMenuState, { type: "setCount", value: 4 }).count,
+    ).toBe(4);
   });
 
   it("parseSucceeded pads to count with blank items and sets globalStatus=generating", () => {
@@ -1558,7 +1632,11 @@ describe("menuReducer", () => {
       makeCard("a", "generating"),
       makeCard("b", "generating"),
     ]);
-    const a = menuReducer(state, { type: "cardSucceeded", id: "a", imageUrl: "u" });
+    const a = menuReducer(state, {
+      type: "cardSucceeded",
+      id: "a",
+      imageUrl: "u",
+    });
     const b = menuReducer(a, { type: "cardFailed", id: "b", message: "x" });
     expect(b.globalStatus).toBe("partial");
   });
@@ -1670,7 +1748,10 @@ export function menuReducer(state: MenuState, action: MenuAction): MenuState {
         description: item.description,
         price: item.price,
         imageUrl: null,
-        status: item.name === "" && item.description === "" ? "pending" : "generating",
+        status:
+          item.name === "" && item.description === ""
+            ? "pending"
+            : "generating",
       }));
       return { ...state, cards, globalStatus: "generating" };
     }
@@ -1758,6 +1839,7 @@ git commit -m "implement menuReducer per menu-generation spec"
 **Owners:** `allium:tend`, `test-engineer`, `frontend-engineer`.
 **Blocked by:** Task 1.
 **Files:**
+
 - Create: `specs/api-key.allium`
 - Create: `src/hooks/useApiKey.ts`
 - Create: `src/hooks/useApiKey.test.ts`
@@ -1897,6 +1979,7 @@ git commit -m "implement useApiKey hook"
 **Owners:** `test-engineer` and `frontend-engineer`.
 **Blocked by:** Task 9.
 **Files:**
+
 - Create: `src/components/ApiKeyForm.tsx` + `.module.css` + `.test.tsx`
 - Create: `src/components/ApiKeyGate.tsx` + `.test.tsx`
 
@@ -2028,9 +2111,21 @@ Create `src/components/ApiKeyForm.module.css`:
   margin: var(--space-7) auto;
   box-shadow: var(--shadow-card);
 }
-.title { font-family: var(--font-display); font-size: 1.5rem; margin: 0 0 var(--space-3); }
-.subtitle { color: var(--color-ink-soft); margin: 0 0 var(--space-5); }
-.label { display: block; font-size: 0.85rem; color: var(--color-ink-soft); margin-bottom: var(--space-2); }
+.title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  margin: 0 0 var(--space-3);
+}
+.subtitle {
+  color: var(--color-ink-soft);
+  margin: 0 0 var(--space-5);
+}
+.label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--color-ink-soft);
+  margin-bottom: var(--space-2);
+}
 .input {
   width: 100%;
   padding: var(--space-3) var(--space-4);
@@ -2048,8 +2143,15 @@ Create `src/components/ApiKeyForm.module.css`:
   border-radius: var(--radius-md);
   font-weight: 500;
 }
-.save:disabled { opacity: 0.5; cursor: not-allowed; }
-.hint { font-size: 0.8rem; color: var(--color-ink-mute); margin-top: var(--space-4); }
+.save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.hint {
+  font-size: 0.8rem;
+  color: var(--color-ink-mute);
+  margin-top: var(--space-4);
+}
 ```
 
 Create `src/components/ApiKeyForm.tsx`:
@@ -2072,8 +2174,8 @@ export function ApiKeyForm({ onSave }: { onSave: (key: string) => void }) {
     <form className={styles.form} onSubmit={handleSubmit}>
       <h1 className={styles.title}>Menu Generator</h1>
       <p className={styles.subtitle}>
-        Paste your Gemini API key to start generating menus. The key stays in your
-        browser — nothing is sent to a server other than Google.
+        Paste your Gemini API key to start generating menus. The key stays in
+        your browser — nothing is sent to a server other than Google.
       </p>
       <label className={styles.label} htmlFor="api-key">
         Gemini API key
@@ -2091,7 +2193,11 @@ export function ApiKeyForm({ onSave }: { onSave: (key: string) => void }) {
       </button>
       <p className={styles.hint}>
         Get a key from{" "}
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">
+        <a
+          href="https://aistudio.google.com/app/apikey"
+          target="_blank"
+          rel="noreferrer"
+        >
           aistudio.google.com
         </a>
         .
@@ -2158,7 +2264,9 @@ import { Header } from "./Header";
 describe("Header", () => {
   it("renders the wordmark and tagline", () => {
     render(<Header />);
-    expect(screen.getByRole("heading", { level: 1, name: /menu generator/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: /menu generator/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/create your graphical menu/i)).toBeInTheDocument();
   });
 
@@ -2192,7 +2300,10 @@ Create `src/components/Header.module.css`:
   place-items: center;
   font-weight: 600;
 }
-.wordmark { display: flex; flex-direction: column; }
+.wordmark {
+  display: flex;
+  flex-direction: column;
+}
 .title {
   font-family: var(--font-display);
   font-size: 1.05rem;
@@ -2217,7 +2328,9 @@ import styles from "./Header.module.css";
 export function Header() {
   return (
     <header className={styles.header}>
-      <div className={styles.mark} aria-hidden="true">+</div>
+      <div className={styles.mark} aria-hidden="true">
+        +
+      </div>
       <div className={styles.wordmark}>
         <h1 className={styles.title}>Menu Generator</h1>
         <p className={styles.tagline}>Create your graphical menu</p>
@@ -2301,15 +2414,23 @@ Create `src/components/CountStepper.module.css`:
   background: white;
 }
 .btn {
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
   font-size: 1.1rem;
   line-height: 1;
 }
-.btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.value { min-width: 1.5em; text-align: center; font-variant-numeric: tabular-nums; }
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.value {
+  min-width: 1.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 ```
 
 Create `src/components/CountStepper.tsx`:
@@ -2392,7 +2513,9 @@ describe("SuggestionChips", () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
     render(<SuggestionChips onPick={onPick} />);
-    await user.click(screen.getByRole("button", { name: SUGGESTIONS[0].label }));
+    await user.click(
+      screen.getByRole("button", { name: SUGGESTIONS[0].label }),
+    );
     expect(onPick).toHaveBeenCalledWith(SUGGESTIONS[0].prompt);
   });
 });
@@ -2405,7 +2528,12 @@ Run, fail, commit failing.
 Create `src/components/SuggestionChips.module.css`:
 
 ```css
-.row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
 .chip {
   background: var(--color-surface-2);
   border: 1px solid var(--color-divider);
@@ -2414,7 +2542,9 @@ Create `src/components/SuggestionChips.module.css`:
   font-size: 0.8rem;
   color: var(--color-ink-soft);
 }
-.chip:hover { background: white; }
+.chip:hover {
+  background: white;
+}
 ```
 
 Create `src/components/SuggestionChips.tsx`:
@@ -2423,13 +2553,31 @@ Create `src/components/SuggestionChips.tsx`:
 import styles from "./SuggestionChips.module.css";
 
 export const SUGGESTIONS = [
-  { label: "Italian tasting menu", prompt: "An Italian tasting menu with antipasto, pasta, main, and a dolce." },
-  { label: "Sunday brunch", prompt: "A relaxed Sunday brunch with eggs, pancakes, a salad, and a coffee drink." },
-  { label: "Cocktail flight", prompt: "Four cocktails of contrasting styles served as a flight." },
-  { label: "Trattoria dinner", prompt: "A rustic trattoria dinner with bread, antipasto, a hearty pasta, and tiramisu." },
+  {
+    label: "Italian tasting menu",
+    prompt: "An Italian tasting menu with antipasto, pasta, main, and a dolce.",
+  },
+  {
+    label: "Sunday brunch",
+    prompt:
+      "A relaxed Sunday brunch with eggs, pancakes, a salad, and a coffee drink.",
+  },
+  {
+    label: "Cocktail flight",
+    prompt: "Four cocktails of contrasting styles served as a flight.",
+  },
+  {
+    label: "Trattoria dinner",
+    prompt:
+      "A rustic trattoria dinner with bread, antipasto, a hearty pasta, and tiramisu.",
+  },
 ] as const;
 
-export function SuggestionChips({ onPick }: { onPick: (prompt: string) => void }) {
+export function SuggestionChips({
+  onPick,
+}: {
+  onPick: (prompt: string) => void;
+}) {
   return (
     <div className={styles.row}>
       {SUGGESTIONS.map((s) => (
@@ -2460,6 +2608,7 @@ git commit -m "add SuggestionChips component"
 
 **Project tasks:** `Spec: reference-photo` + `Tests: reference-photo-dropzone` + `Implement: reference-photo-dropzone`.
 **Files:**
+
 - Create: `specs/reference-photo.allium`
 - Create: `src/components/ReferencePhotoDropzone.tsx` + `.module.css` + `.test.tsx`
 
@@ -2503,7 +2652,10 @@ describe("ReferencePhotoDropzone", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(
-      <ReferencePhotoDropzone file={makeFile("dinner.png", "image/png")} onFileChange={onChange} />,
+      <ReferencePhotoDropzone
+        file={makeFile("dinner.png", "image/png")}
+        onFileChange={onChange}
+      />,
     );
     expect(screen.getByText(/dinner\.png/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /remove/i }));
@@ -2515,7 +2667,10 @@ describe("ReferencePhotoDropzone", () => {
     const onChange = vi.fn();
     render(<ReferencePhotoDropzone file={null} onFileChange={onChange} />);
     const input = screen.getByLabelText(/browse/i) as HTMLInputElement;
-    await user.upload(input, new File(["x"], "doc.pdf", { type: "application/pdf" }));
+    await user.upload(
+      input,
+      new File(["x"], "doc.pdf", { type: "application/pdf" }),
+    );
     expect(onChange).toHaveBeenCalledWith(null);
   });
 });
@@ -2538,11 +2693,30 @@ Create `src/components/ReferencePhotoDropzone.module.css`:
   gap: var(--space-3);
   min-height: 76px;
 }
-.label { color: var(--color-ink-soft); font-size: 0.9rem; }
-.browse { color: var(--color-accent); text-decoration: underline; cursor: pointer; }
-.file { display: flex; align-items: center; gap: var(--space-3); width: 100%; }
-.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); }
-.name { font-size: 0.9rem; }
+.label {
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
+}
+.browse {
+  color: var(--color-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+.thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+.name {
+  font-size: 0.9rem;
+}
 .remove {
   margin-left: auto;
   background: none;
@@ -2550,7 +2724,13 @@ Create `src/components/ReferencePhotoDropzone.module.css`:
   color: var(--color-ink-mute);
   text-decoration: underline;
 }
-.hidden { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+.hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
 ```
 
 Create `src/components/ReferencePhotoDropzone.tsx`:
@@ -2730,6 +2910,7 @@ git commit -m "add ChangeApiKeyLink"
 
 **Project tasks:** `Spec: prompt-form` + `Tests: prompt-form` + `Implement: prompt-form`.
 **Files:**
+
 - Create: `specs/prompt-form.allium`
 - Create: `src/components/PromptForm.tsx` + `.module.css` + `.test.tsx`
 
@@ -2751,38 +2932,87 @@ import { PromptForm } from "./PromptForm";
 
 describe("PromptForm", () => {
   it("disables Generate menu when prompt is empty and no photo is set", () => {
-    render(<PromptForm count={4} onCountChange={() => {}} onGenerate={() => {}} isGenerating={false} />);
-    expect(screen.getByRole("button", { name: /generate menu/i })).toBeDisabled();
+    render(
+      <PromptForm
+        count={4}
+        onCountChange={() => {}}
+        onGenerate={() => {}}
+        isGenerating={false}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: /generate menu/i }),
+    ).toBeDisabled();
   });
 
   it("enables Generate menu when prompt is non-empty", async () => {
     const user = userEvent.setup();
-    render(<PromptForm count={4} onCountChange={() => {}} onGenerate={() => {}} isGenerating={false} />);
+    render(
+      <PromptForm
+        count={4}
+        onCountChange={() => {}}
+        onGenerate={() => {}}
+        isGenerating={false}
+      />,
+    );
     await user.type(screen.getByLabelText(/describe today's menu/i), "pizza");
-    expect(screen.getByRole("button", { name: /generate menu/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /generate menu/i }),
+    ).toBeEnabled();
   });
 
   it("clicking a suggestion chip fills the textarea", async () => {
     const user = userEvent.setup();
-    render(<PromptForm count={4} onCountChange={() => {}} onGenerate={() => {}} isGenerating={false} />);
-    await user.click(screen.getByRole("button", { name: /italian tasting menu/i }));
-    expect(screen.getByLabelText(/describe today's menu/i)).toHaveValue(expect.stringMatching(/italian/i));
+    render(
+      <PromptForm
+        count={4}
+        onCountChange={() => {}}
+        onGenerate={() => {}}
+        isGenerating={false}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: /italian tasting menu/i }),
+    );
+    expect(screen.getByLabelText(/describe today's menu/i)).toHaveValue(
+      expect.stringMatching(/italian/i),
+    );
   });
 
   it("calls onGenerate with the assembled request", async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();
-    render(<PromptForm count={4} onCountChange={() => {}} onGenerate={onGenerate} isGenerating={false} />);
+    render(
+      <PromptForm
+        count={4}
+        onCountChange={() => {}}
+        onGenerate={onGenerate}
+        isGenerating={false}
+      />,
+    );
     await user.type(screen.getByLabelText(/describe today's menu/i), "tacos");
     await user.click(screen.getByRole("button", { name: /generate menu/i }));
     expect(onGenerate).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: "tacos", count: 4, referencePhoto: null }),
+      expect.objectContaining({
+        prompt: "tacos",
+        count: 4,
+        referencePhoto: null,
+      }),
     );
   });
 
   it("disables Generate menu while isGenerating is true", () => {
-    render(<PromptForm count={4} onCountChange={() => {}} onGenerate={() => {}} isGenerating />);
-    expect(screen.getByRole("button", { name: /generate menu/i })).toBeDisabled();
+    render(
+      <PromptForm
+        count={4}
+        onCountChange={() => {}}
+        onGenerate={() => {}}
+        isGenerating
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: /generate menu/i }),
+    ).toBeDisabled();
   });
 });
 ```
@@ -2804,9 +3034,23 @@ Create `src/components/PromptForm.module.css`:
   grid-template-columns: 2fr 1fr;
   box-shadow: var(--shadow-card);
 }
-.left { display: flex; flex-direction: column; gap: var(--space-2); }
-.right { display: flex; flex-direction: column; gap: var(--space-3); align-items: stretch; }
-.label { font-size: 0.72rem; letter-spacing: 0.12em; color: var(--color-ink-mute); text-transform: uppercase; }
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+.label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: var(--color-ink-mute);
+  text-transform: uppercase;
+}
 .textarea {
   min-height: 96px;
   resize: vertical;
@@ -2825,10 +3069,20 @@ Create `src/components/PromptForm.module.css`:
   padding: var(--space-3) var(--space-4);
   font-weight: 500;
 }
-.cta:disabled { opacity: 0.5; cursor: not-allowed; }
-.controls { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
 @media (max-width: 720px) {
-  .card { grid-template-columns: 1fr; }
+  .card {
+    grid-template-columns: 1fr;
+  }
 }
 ```
 
@@ -2861,14 +3115,16 @@ export function PromptForm({
 }) {
   const [prompt, setPrompt] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
-  const canSubmit = (prompt.trim().length > 0 || photo !== null) && !isGenerating;
+  const canSubmit =
+    (prompt.trim().length > 0 || photo !== null) && !isGenerating;
 
   return (
     <form
       className={styles.card}
       onSubmit={(e) => {
         e.preventDefault();
-        if (canSubmit) onGenerate({ prompt: prompt.trim(), referencePhoto: photo, count });
+        if (canSubmit)
+          onGenerate({ prompt: prompt.trim(), referencePhoto: photo, count });
       }}
     >
       <div className={styles.left}>
@@ -2914,6 +3170,7 @@ git commit -m "compose PromptForm with all input controls"
 
 **Project tasks:** `Spec: menu-card` + `Tests: menu-card` + `Implement: menu-card`.
 **Files:**
+
 - Create: `specs/menu-card.allium`
 - Create: `src/components/MenuCard.tsx` + `.module.css` + `.test.tsx`
 
@@ -2947,7 +3204,9 @@ function makeCard(overrides: Partial<Card> = {}): Card {
 
 describe("MenuCard", () => {
   it("renders the image, name, description and price", () => {
-    render(<MenuCard card={makeCard()} onEdit={() => {}} onRegenerate={() => {}} />);
+    render(
+      <MenuCard card={makeCard()} onEdit={() => {}} onRegenerate={() => {}} />,
+    );
     expect(screen.getByRole("img")).toHaveAttribute("src", "blob:img");
     expect(screen.getByDisplayValue("Rigatoni")).toBeInTheDocument();
     expect(screen.getByDisplayValue("tomato + guanciale")).toBeInTheDocument();
@@ -2955,7 +3214,13 @@ describe("MenuCard", () => {
   });
 
   it("shows a skeleton when status is generating", () => {
-    render(<MenuCard card={makeCard({ status: "generating", imageUrl: null })} onEdit={() => {}} onRegenerate={() => {}} />);
+    render(
+      <MenuCard
+        card={makeCard({ status: "generating", imageUrl: null })}
+        onEdit={() => {}}
+        onRegenerate={() => {}}
+      />,
+    );
     expect(screen.getByTestId("card-skeleton")).toBeInTheDocument();
   });
 
@@ -2964,7 +3229,11 @@ describe("MenuCard", () => {
     const onRegenerate = vi.fn();
     render(
       <MenuCard
-        card={makeCard({ status: "error", imageUrl: null, errorMessage: "Rate limited" })}
+        card={makeCard({
+          status: "error",
+          imageUrl: null,
+          errorMessage: "Rate limited",
+        })}
         onEdit={() => {}}
         onRegenerate={onRegenerate}
       />,
@@ -2977,7 +3246,9 @@ describe("MenuCard", () => {
   it("calls onEdit with the new value when the user edits a field", async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();
-    render(<MenuCard card={makeCard()} onEdit={onEdit} onRegenerate={() => {}} />);
+    render(
+      <MenuCard card={makeCard()} onEdit={onEdit} onRegenerate={() => {}} />,
+    );
     const nameField = screen.getByDisplayValue("Rigatoni") as HTMLInputElement;
     await user.clear(nameField);
     await user.type(nameField, "Cacio e Pepe");
@@ -2987,7 +3258,13 @@ describe("MenuCard", () => {
   it("clicking the regenerate button calls onRegenerate with the card id", async () => {
     const user = userEvent.setup();
     const onRegenerate = vi.fn();
-    render(<MenuCard card={makeCard()} onEdit={() => {}} onRegenerate={onRegenerate} />);
+    render(
+      <MenuCard
+        card={makeCard()}
+        onEdit={() => {}}
+        onRegenerate={onRegenerate}
+      />,
+    );
     await user.click(screen.getByRole("button", { name: /regenerate/i }));
     expect(onRegenerate).toHaveBeenCalledWith("a");
   });
@@ -3016,19 +3293,44 @@ Create `src/components/MenuCard.module.css`:
   display: grid;
   place-items: center;
 }
-.img { width: 100%; height: 100%; object-fit: cover; }
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .skel {
-  width: 80%; height: 60%;
-  background: linear-gradient(90deg, var(--color-surface-2), var(--color-divider), var(--color-surface-2));
+  width: 80%;
+  height: 60%;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2),
+    var(--color-divider),
+    var(--color-surface-2)
+  );
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
   border-radius: var(--radius-md);
 }
-@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-.error { color: var(--color-error); text-align: center; padding: var(--space-3); font-size: 0.85rem; }
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.error {
+  color: var(--color-error);
+  text-align: center;
+  padding: var(--space-3);
+  font-size: 0.85rem;
+}
 .cat {
-  position: absolute; top: var(--space-3); left: var(--space-3);
-  background: white; color: var(--color-ink-soft);
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  background: white;
+  color: var(--color-ink-soft);
   border-radius: var(--radius-sm);
   padding: 2px 8px;
   font-size: 0.7rem;
@@ -3036,18 +3338,63 @@ Create `src/components/MenuCard.module.css`:
   text-transform: uppercase;
 }
 .regen {
-  position: absolute; top: var(--space-3); right: var(--space-3);
-  background: white; border: none; width: 32px; height: 32px;
-  border-radius: var(--radius-pill); cursor: pointer; font-size: 1rem;
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  background: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 1rem;
 }
-.body { padding: var(--space-4); display: grid; gap: var(--space-2); }
-.row { display: flex; align-items: baseline; gap: var(--space-3); }
-.name { flex: 1; font-family: var(--font-display); font-size: 1.1rem; border: none; background: transparent; padding: 0; }
-.price { background: var(--color-surface-2); border-radius: var(--radius-sm); padding: 2px 8px; font-size: 0.85rem; border: none; max-width: 80px; text-align: right; }
-.desc { font-style: italic; color: var(--color-ink-soft); font-size: 0.9rem; border: none; background: transparent; padding: 0; resize: none; width: 100%; }
+.body {
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-2);
+}
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.name {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.price {
+  background: var(--color-surface-2);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  border: none;
+  max-width: 80px;
+  text-align: right;
+}
+.desc {
+  font-style: italic;
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  resize: none;
+  width: 100%;
+}
 .catInput {
-  background: white; border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
-  padding: 2px 6px; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; width: 96px;
+  background: white;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  width: 96px;
 }
 ```
 
@@ -3063,20 +3410,31 @@ export function MenuCard({
   onRegenerate,
 }: {
   card: Card;
-  onEdit: (id: string, field: "category" | "name" | "description" | "price", value: string) => void;
+  onEdit: (
+    id: string,
+    field: "category" | "name" | "description" | "price",
+    value: string,
+  ) => void;
   onRegenerate: (id: string) => void;
 }) {
-  const showSkeleton = card.status === "generating" || card.status === "pending";
+  const showSkeleton =
+    card.status === "generating" || card.status === "pending";
 
   return (
     <article className={styles.card}>
       <div className={styles.imgWrap}>
         {card.status === "ready" && card.imageUrl ? (
-          <img className={styles.img} src={card.imageUrl} alt={card.name || "Generated dish"} />
+          <img
+            className={styles.img}
+            src={card.imageUrl}
+            alt={card.name || "Generated dish"}
+          />
         ) : showSkeleton ? (
           <div className={styles.skel} data-testid="card-skeleton" />
         ) : (
-          <p className={styles.error}>{card.errorMessage ?? "Failed to generate"}</p>
+          <p className={styles.error}>
+            {card.errorMessage ?? "Failed to generate"}
+          </p>
         )}
         <input
           className={styles.catInput}
@@ -3088,7 +3446,9 @@ export function MenuCard({
         <button
           type="button"
           className={styles.regen}
-          aria-label={card.status === "error" ? "Retry / regenerate" : "Regenerate"}
+          aria-label={
+            card.status === "error" ? "Retry / regenerate" : "Regenerate"
+          }
           onClick={() => onRegenerate(card.id)}
         >
           ↻
@@ -3164,19 +3524,35 @@ function card(id: string, name: string): MenuCard {
 describe("MenuGrid", () => {
   it("renders one MenuCard per entry", () => {
     render(
-      <MenuGrid cards={[card("a", "X"), card("b", "Y")]} onEdit={() => {}} onRegenerate={() => {}} />,
+      <MenuGrid
+        cards={[card("a", "X"), card("b", "Y")]}
+        onEdit={() => {}}
+        onRegenerate={() => {}}
+      />,
     );
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
   it("renders the subtitle 'N courses, plated' when cards are ready", () => {
-    const ready = (id: string): MenuCard => ({ ...card(id, "z"), status: "ready", imageUrl: "u" });
-    render(<MenuGrid cards={[ready("a"), ready("b")]} onEdit={() => {}} onRegenerate={() => {}} />);
+    const ready = (id: string): MenuCard => ({
+      ...card(id, "z"),
+      status: "ready",
+      imageUrl: "u",
+    });
+    render(
+      <MenuGrid
+        cards={[ready("a"), ready("b")]}
+        onEdit={() => {}}
+        onRegenerate={() => {}}
+      />,
+    );
     expect(screen.getByText(/2 courses/i)).toBeInTheDocument();
   });
 
   it("renders nothing visible when cards is empty", () => {
-    const { container } = render(<MenuGrid cards={[]} onEdit={() => {}} onRegenerate={() => {}} />);
+    const { container } = render(
+      <MenuGrid cards={[]} onEdit={() => {}} onRegenerate={() => {}} />,
+    );
     expect(container.querySelectorAll("article")).toHaveLength(0);
   });
 });
@@ -3189,7 +3565,9 @@ Run, fail, commit failing.
 Create `src/components/MenuGrid.module.css`:
 
 ```css
-.section { margin-top: var(--space-7); }
+.section {
+  margin-top: var(--space-7);
+}
 .subtitle {
   font-family: var(--font-display);
   font-size: 1.6rem;
@@ -3214,7 +3592,9 @@ Create `src/components/MenuGrid.module.css`:
   grid-template-columns: repeat(2, 1fr);
 }
 @media (max-width: 720px) {
-  .grid { grid-template-columns: 1fr; }
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 ```
 
@@ -3231,7 +3611,11 @@ export function MenuGrid({
   onRegenerate,
 }: {
   cards: Card[];
-  onEdit: (id: string, field: "category" | "name" | "description" | "price", value: string) => void;
+  onEdit: (
+    id: string,
+    field: "category" | "name" | "description" | "price",
+    value: string,
+  ) => void;
   onRegenerate: (id: string) => void;
 }) {
   if (cards.length === 0) return null;
@@ -3239,12 +3623,21 @@ export function MenuGrid({
   return (
     <section className={styles.section}>
       <h2 className={styles.subtitle}>
-        <span>{cards.length === 1 ? "One course, plated" : `${cards.length} courses, plated`}</span>
+        <span>
+          {cards.length === 1
+            ? "One course, plated"
+            : `${cards.length} courses, plated`}
+        </span>
         <span className={styles.badge}>{readyCount} ready</span>
       </h2>
       <div className={styles.grid}>
         {cards.map((c) => (
-          <MenuCard key={c.id} card={c} onEdit={onEdit} onRegenerate={onRegenerate} />
+          <MenuCard
+            key={c.id}
+            card={c}
+            onEdit={onEdit}
+            onRegenerate={onRegenerate}
+          />
         ))}
       </div>
     </section>
@@ -3335,6 +3728,7 @@ git commit -m "add ErrorBanner"
 **Owner:** `frontend-engineer`.
 **Blocked by:** Tasks 7, 8, 10, 11, 16, 18, 19.
 **Files:**
+
 - Modify: `src/main.tsx`
 - Replace: `src/App.tsx`
 - Delete: `src/App.css` (no longer used)
@@ -3366,7 +3760,8 @@ function useMenuGenerator(): MenuGenerator {
   const { apiKey } = useApiKey();
   const isFake = new URLSearchParams(window.location.search).has("fake");
   return useMemo(
-    () => (isFake || !apiKey ? fakeMenuGenerator() : geminiMenuGenerator(apiKey)),
+    () =>
+      isFake || !apiKey ? fakeMenuGenerator() : geminiMenuGenerator(apiKey),
     [isFake, apiKey],
   );
 }
@@ -3400,8 +3795,11 @@ function Main() {
   }, []);
 
   const onEdit = useCallback(
-    (id: string, field: "category" | "name" | "description" | "price", value: string) =>
-      dispatch({ type: "editCardField", id, field, value }),
+    (
+      id: string,
+      field: "category" | "name" | "description" | "price",
+      value: string,
+    ) => dispatch({ type: "editCardField", id, field, value }),
     [],
   );
 
@@ -3419,7 +3817,9 @@ function Main() {
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         const message =
-          err instanceof GeneratorError ? err.message : "Failed to generate image.";
+          err instanceof GeneratorError
+            ? err.message
+            : "Failed to generate image.";
         dispatch({ type: "cardFailed", id: card.id, message });
       }
     },
@@ -3436,11 +3836,17 @@ function Main() {
       let items: ParsedMenuItem[] = [];
       try {
         items = req.referencePhoto
-          ? await gen.parseMenuFromImage(req.referencePhoto, { signal: controller.signal })
-          : await gen.parseMenuFromText(req.prompt, { signal: controller.signal });
+          ? await gen.parseMenuFromImage(req.referencePhoto, {
+              signal: controller.signal,
+            })
+          : await gen.parseMenuFromText(req.prompt, {
+              signal: controller.signal,
+            });
       } catch (err) {
         const message =
-          err instanceof GeneratorError ? err.message : "Failed to parse menu input.";
+          err instanceof GeneratorError
+            ? err.message
+            : "Failed to parse menu input.";
         dispatch({ type: "fail", message });
         return;
       }
@@ -3452,9 +3858,7 @@ function Main() {
       // We rely on the dispatch-and-read pattern via a setTimeout(0) trick so
       // React has flushed the parseSucceeded reducer update.
       setTimeout(() => {
-        const ids = state.cards.length
-          ? state.cards.map((c) => c.id)
-          : []; // placeholder — see note below
+        const ids = state.cards.length ? state.cards.map((c) => c.id) : []; // placeholder — see note below
         // We read the latest reducer state by attaching a one-off effect via
         // dispatch; simpler approach: re-derive cards from a snapshot ref.
         // Implementation alternative: drive fan-out by useEffect on cards.length.
@@ -3469,7 +3873,9 @@ function Main() {
     if (state.globalStatus !== "generating") return;
     const controller = abortRef.current;
     if (!controller) return;
-    const pending = state.cards.filter((c) => c.status === "generating" || c.status === "pending");
+    const pending = state.cards.filter(
+      (c) => c.status === "generating" || c.status === "pending",
+    );
     pending.forEach((card) => {
       if (card.name === "" && card.description === "") return;
       void generateOneCard(card, controller.signal);
@@ -3485,7 +3891,10 @@ function Main() {
       abortRef.current?.abort();
       abortRef.current = controller;
       dispatch({ type: "regenerateCard", id });
-      void generateOneCard({ ...card, status: "generating", imageUrl: null }, controller.signal);
+      void generateOneCard(
+        { ...card, status: "generating", imageUrl: null },
+        controller.signal,
+      );
     },
     [generateOneCard, state.cards],
   );
@@ -3502,7 +3911,11 @@ function Main() {
         isGenerating={isGenerating}
       />
       <ErrorBanner message={state.globalError} />
-      <MenuGrid cards={state.cards} onEdit={onEdit} onRegenerate={onRegenerate} />
+      <MenuGrid
+        cards={state.cards}
+        onEdit={onEdit}
+        onRegenerate={onRegenerate}
+      />
     </main>
   );
 }
@@ -3617,12 +4030,19 @@ describe("Flow A — text-only", () => {
     render(<App />);
     await user.type(screen.getByLabelText(/describe today's menu/i), "italian");
     await user.click(screen.getByRole("button", { name: /generate menu/i }));
-    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(4), { timeout: 4000 });
+    await waitFor(
+      () => expect(screen.getAllByRole("article")).toHaveLength(4),
+      { timeout: 4000 },
+    );
 
     const articles = screen.getAllByRole("article");
-    const regenBtn = articles[0].querySelector("button[aria-label*='egenerate']") as HTMLButtonElement;
+    const regenBtn = articles[0].querySelector(
+      "button[aria-label*='egenerate']",
+    ) as HTMLButtonElement;
     await user.click(regenBtn);
-    expect(articles[0].querySelector("[data-testid='card-skeleton']")).toBeTruthy();
+    expect(
+      articles[0].querySelector("[data-testid='card-skeleton']"),
+    ).toBeTruthy();
   });
 });
 ```
@@ -3672,13 +4092,20 @@ describe("Flow B — upload reference photo", () => {
     render(<App />);
     const file = new File(["x"], "menu.jpg", { type: "image/jpeg" });
     await user.upload(
-      screen.getByLabelText(/browse for a reference photo/i) as HTMLInputElement,
+      screen.getByLabelText(
+        /browse for a reference photo/i,
+      ) as HTMLInputElement,
       file,
     );
     await user.click(screen.getByRole("button", { name: /generate menu/i }));
-    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(4), { timeout: 4000 });
+    await waitFor(
+      () => expect(screen.getAllByRole("article")).toHaveLength(4),
+      { timeout: 4000 },
+    );
     // Card text pre-filled by the fake parser:
-    expect(screen.getByDisplayValue(/Rigatoni all'Amatriciana/i)).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue(/Rigatoni all'Amatriciana/i),
+    ).toBeInTheDocument();
   });
 });
 ```
@@ -3719,15 +4146,15 @@ Expected: all clean.
 
 - [ ] **Step 4: Manual QA matrix**
 
-| Path | Expected |
-|---|---|
-| `/?fake=true`, click Generate with default prompt | 4 cards appear with placeholder images |
-| `/?fake=true`, count=2, type prompt, generate | 2 cards |
-| `/?fake=true`, upload an image, generate | 4 cards with Italian text pre-filled |
-| `/?fake=true`, click ↻ on card 1 | only card 1 reshuffles |
-| `/?fake=true`, edit card name | text persists; image untouched |
-| `/`, no key, paste invalid key | gate accepts; gen attempts will surface a GeneratorError |
-| `/`, Change API key link | localStorage cleared, page reloads to gate |
+| Path                                              | Expected                                                 |
+| ------------------------------------------------- | -------------------------------------------------------- |
+| `/?fake=true`, click Generate with default prompt | 4 cards appear with placeholder images                   |
+| `/?fake=true`, count=2, type prompt, generate     | 2 cards                                                  |
+| `/?fake=true`, upload an image, generate          | 4 cards with Italian text pre-filled                     |
+| `/?fake=true`, click ↻ on card 1                  | only card 1 reshuffles                                   |
+| `/?fake=true`, edit card name                     | text persists; image untouched                           |
+| `/`, no key, paste invalid key                    | gate accepts; gen attempts will surface a GeneratorError |
+| `/`, Change API key link                          | localStorage cleared, page reloads to gate               |
 
 Document any discrepancies and file follow-up Project tasks (owner: `code-health`).
 
@@ -3772,7 +4199,7 @@ Run through this checklist against the spec (`docs/superpowers/specs/2026-05-09-
 
 - "TBD" / "TODO": none.
 - "Implement later" / "fill in details": none.
-- One callout in Task 20 deliberately shows a *wrong* pattern (`setTimeout`) and tells the engineer to delete it; this is annotated, not a placeholder.
+- One callout in Task 20 deliberately shows a _wrong_ pattern (`setTimeout`) and tells the engineer to delete it; this is annotated, not a placeholder.
 - "Similar to Task N": none — each task contains its own test and impl code in full.
 
 **3. Type consistency:**

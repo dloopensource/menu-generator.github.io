@@ -8,12 +8,20 @@
   background: white;
 }
 .btn {
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
   font-size: 1.1rem;
   line-height: 1;
 }
-.btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.value { min-width: 1.5em; text-align: center; font-variant-numeric: tabular-nums; }
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.value {
+  min-width: 1.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

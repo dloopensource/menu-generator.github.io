@@ -35,7 +35,12 @@ export type MenuAction =
   | { type: "startGeneration" }
   | {
       type: "parseSucceeded";
-      items: { category: string; name: string; description: string; price: string }[];
+      items: {
+        category: string;
+        name: string;
+        description: string;
+        price: string;
+      }[];
     }
   | { type: "cardStarted"; id: string }
   | { type: "cardSucceeded"; id: string; imageUrl: string }
