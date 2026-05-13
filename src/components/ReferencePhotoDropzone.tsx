@@ -65,6 +65,7 @@ export function ReferencePhotoDropzone({
           browse
           <input
             type="file"
+            accept={ACCEPTED.join(",")}
             className={styles.hidden}
             aria-label="browse for a reference photo"
             onChange={(e) => {
