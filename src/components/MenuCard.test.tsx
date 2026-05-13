@@ -83,4 +83,23 @@ describe("MenuCard", () => {
     await user.click(screen.getByRole("button", { name: /regenerate/i }));
     expect(onRegenerate).toHaveBeenCalledWith("a");
   });
+
+  it("disables the regenerate button when card is pending and both name and description are empty", () => {
+    render(
+      <MenuCard
+        card={{
+          id: "blank",
+          category: "",
+          name: "",
+          description: "",
+          price: "",
+          imageUrl: null,
+          status: "pending",
+        }}
+        onEdit={() => {}}
+        onRegenerate={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /regenerate/i })).toBeDisabled();
+  });
 });
