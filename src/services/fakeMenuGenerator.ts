@@ -69,13 +69,14 @@ export function fakeMenuGenerator(): MenuGenerator {
     async generateDishImage(input: DishPrompt, opts: GenerateImageOptions) {
       await delay(jitter(600, 1200), opts.signal);
       const seed = hashString(`${input.name}|${input.description}`);
-      const res = await fetch(`https://picsum.photos/seed/${seed}/640/480`, {
-        signal: opts.signal,
-      });
-      if (!res.ok) {
-        throw new Error(`fake image fetch failed: ${res.status}`);
+      // Synthetic Blob placeholder: deterministic per input, same-realm, no network.
+      const bytes = new Uint8Array(1024);
+      let s = seed || 1;
+      for (let i = 0; i < bytes.length; i++) {
+        s = (s * 9301 + 49297) % 233280;
+        bytes[i] = s & 0xff;
       }
-      return await res.blob();
+      return new Blob([bytes], { type: "image/png" });
     },
   };
 }
