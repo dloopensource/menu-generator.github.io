@@ -53,13 +53,50 @@ rule ParseRouting {
 
 -- Flow: Fan-out from parsed items to MenuItem entities
 
+rule PadOrTrimToCount {
+    -- Before fan-out, the raw parser result list is normalised so its length
+    -- exactly equals generation.request.count. Two cases:
+    --   Trim: if the parser returned more than count items, only the first
+    --         count items are kept. The remainder are silently dropped.
+    --   Pad:  if the parser returned fewer than count items, blank
+    --         ParsedMenuItem records ({category:"", name:"", description:"",
+    --         price:""}) are appended until the list length equals count.
+    -- After normalisation, FanOutGeneration creates exactly count MenuItem
+    -- entities, so generation.items.length = generation.request.count always
+    -- holds after OnParseSucceeded completes.
+    -- Pad-inserted items are blank (both name and description empty), so they
+    -- are created at status=pending and remain there — they are never
+    -- automatically advanced to generating. The user must populate at least
+    -- one field and click ↻ to start generation for a blank card.
+    when: OnParseSucceeded(generation, items: List<svc/ParsedMenuItem>)
+    requires: generation.global_status = parsing
+    let count = generation.request.count
+    let normalised = pad_or_trim(items, count)
+    ensures:
+        normalised.length = count
+
+    @guidance
+        -- pad_or_trim(items, count) is a black box:
+        --   if items.length > count → items.take(count)        (trim)
+        --   if items.length < count → items + blank_items(count - items.length) (pad)
+        --   else                   → items                     (pass-through)
+        -- blank_items(n) produces n ParsedMenuItem records with all string
+        -- fields set to "".
+        -- Implementations must apply PadOrTrimToCount and FanOutGeneration
+        -- atomically on the same OnParseSucceeded trigger; the normalised
+        -- list is the input to FanOutGeneration's for-loop.
+}
+
 rule FanOutGeneration {
-    -- After parsing succeeds, one MenuItem is created per ParsedMenuItem in
-    -- the result list. Items with a non-empty name OR non-empty description
-    -- are created at status=pending and immediately advance to generating via
-    -- NonBlankItemStartsGenerating (umbrella). Items where both name and
-    -- description are empty are created at status=pending and stay there until
-    -- the user fills in at least one field and clicks regenerate.
+    -- After parsing succeeds and the item list has been normalised to
+    -- exactly generation.request.count entries (see PadOrTrimToCount), one
+    -- MenuItem is created per normalised ParsedMenuItem. Items with a
+    -- non-empty name OR non-empty description are created at status=pending
+    -- and immediately advance to generating via NonBlankItemStartsGenerating
+    -- (umbrella). Items where both name and description are empty are created
+    -- at status=pending and stay there until the user fills in at least one
+    -- field and clicks regenerate.
+    -- Post-condition: generation.items.length = generation.request.count.
     when: OnParseSucceeded(generation, items: List<svc/ParsedMenuItem>)
     requires: generation.global_status = parsing
     ensures:
@@ -80,11 +117,15 @@ rule FanOutGeneration {
         -- these as separate rules for the same trigger; requires guards must be
         -- non-overlapping. ParseComplete guards on global_status = parsing and
         -- updates the status; FanOutGeneration guards on the same condition and
-        -- creates entities. Implementations must apply both atomically.
-        -- An empty items list is valid (the parser found no structured menu data).
-        -- In that case no MenuItem entities are created and the generation moves
-        -- to generating with zero items. GlobalStatusReconciliation will
-        -- immediately resolve this as done (all zero non-blank items are ready).
+        -- creates entities. Implementations must apply PadOrTrimToCount,
+        -- FanOutGeneration and ParseComplete all atomically.
+        -- In practice, implementations pass the normalised list (output of
+        -- pad_or_trim) as the `items` argument here, so the for-loop iterates
+        -- over exactly generation.request.count elements.
+        -- An empty items list with count=0 is valid (the parser found no
+        -- structured menu data and none were requested). In that case no MenuItem
+        -- entities are created and the generation moves to generating with zero
+        -- items. GlobalStatusReconciliation will immediately resolve this as done.
 }
 
 -- Flow: Global status reconciliation after each card outcome
@@ -167,13 +208,25 @@ rule GlobalStatusReconciliation {
 -- Flow: Per-card regenerate
 
 rule RegenerateSingleCard {
-    -- Resets exactly one card back to generating and clears transient fields.
+    -- Resets exactly one card back to generating and clears transient fields,
+    -- regardless of the card's prior status. Valid prior statuses are:
+    --   pending   → generating  (user filled fields and clicked ↻)
+    --   generating → generating (no-op on status; image_url cleared and
+    --                            generation restarts — guard kept to prevent
+    --                            double-fire against an already-in-flight card;
+    --                            implementations may choose to ignore this case)
+    --   ready     → generating  (user clicks ↻ on a completed card per §1.2 step 5)
+    --   error     → generating  (user clicks ↻ to retry a failed card)
     -- Sibling cards are not affected. The generation's global_status moves to
     -- generating because at least one card is now in flight.
+    -- Blank items (both name and description empty) have a disabled ↻ trigger
+    -- in the UI; this rule therefore only fires for items where
+    -- name != "" or description != "".
     when: OnRegenerateCard(id)
     let item = umbrella/MenuItem{id: id}
     requires: exists item
-    requires: item.status in {error, pending}
+    requires: item.status in {error, pending, ready}
+    requires: item.name != "" or item.description != ""
     ensures:
         item.status = generating
         item.image_url = null
@@ -184,10 +237,15 @@ rule RegenerateSingleCard {
         -- one is being generated. The generation's global_status is forced to
         -- generating unconditionally: since this card is now in flight, the
         -- generation cannot be done or partial.
+        -- The blank-item guard (name != "" or description != "") is a
+        -- correctness guard, not merely a UX hint. Without it a blank card
+        -- could be submitted for generation with no usable prompt. The surface
+        -- must disable the ↻ button for blank cards so users never see the
+        -- trigger rejected.
         -- The umbrella's RegenerateCard rule covers the same trigger. This rule
-        -- adds the guard (item must be in error or pending), the image_url
-        -- clearing, and the global_status side-effect. Implementations combine
-        -- both rule bodies atomically.
+        -- adds the widened status guard (error, pending, ready), the blank-item
+        -- guard, the image_url clearing, and the global_status side-effect.
+        -- Implementations combine both rule bodies atomically.
 }
 
 -- Flow: Inline card field editing
