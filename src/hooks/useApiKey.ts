@@ -11,16 +11,6 @@ export function useApiKey() {
     }
   });
 
-  const setApiKey = useCallback((value: string) => {
-    const trimmed = value.trim();
-    try {
-      window.localStorage.setItem(API_KEY_STORAGE_KEY, trimmed);
-    } catch {
-      /* localStorage disabled — fall back to in-memory state only */
-    }
-    setApiKeyState(trimmed);
-  }, []);
-
   const clearApiKey = useCallback(() => {
     try {
       window.localStorage.removeItem(API_KEY_STORAGE_KEY);
@@ -29,6 +19,20 @@ export function useApiKey() {
     }
     setApiKeyState(null);
   }, []);
+
+  const setApiKey = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      clearApiKey();
+      return;
+    }
+    try {
+      window.localStorage.setItem(API_KEY_STORAGE_KEY, trimmed);
+    } catch {
+      /* localStorage disabled — fall back to in-memory state only */
+    }
+    setApiKeyState(trimmed);
+  }, [clearApiKey]);
 
   return { apiKey, setApiKey, clearApiKey };
 }
