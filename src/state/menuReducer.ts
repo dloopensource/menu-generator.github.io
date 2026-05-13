@@ -39,8 +39,6 @@ export function menuReducer(state: MenuState, action: MenuAction): MenuState {
   switch (action.type) {
     case "setPrompt":
       return { ...state, prompt: action.value };
-    case "setReferencePhoto":
-      return { ...state, referencePhoto: action.file };
     case "setCount":
       return { ...state, count: clamp(action.value, 1, 8) };
     case "startGeneration":

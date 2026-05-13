@@ -42,6 +42,12 @@ export function MenuCard({
     onEdit(card.id, field, value);
   };
 
+  useEffect(() => {
+    const url = card.imageUrl;
+    if (!url || !url.startsWith("blob:")) return;
+    return () => URL.revokeObjectURL(url);
+  }, [card.imageUrl]);
+
   const showSkeleton = card.status === "generating" || card.status === "pending";
   const regenerateDisabled =
     card.status === "pending" && card.name === "" && card.description === "";

@@ -21,7 +21,6 @@ export type GlobalStatus =
 
 export type MenuState = {
   prompt: string;
-  referencePhoto: File | null;
   count: number;
   cards: MenuCard[];
   globalStatus: GlobalStatus;
@@ -30,7 +29,6 @@ export type MenuState = {
 
 export type MenuAction =
   | { type: "setPrompt"; value: string }
-  | { type: "setReferencePhoto"; file: File | null }
   | { type: "setCount"; value: number }
   | { type: "startGeneration" }
   | {
@@ -56,7 +54,6 @@ export type MenuAction =
 
 export const initialMenuState: MenuState = {
   prompt: "",
-  referencePhoto: null,
   count: 4,
   cards: [],
   globalStatus: "idle",
