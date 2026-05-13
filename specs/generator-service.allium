@@ -199,6 +199,16 @@ rule GenerateDishImageError {
         -- wrap_generator_error applies the same mapping as for parse operations.
         -- Both geminiMenuGenerator and fakeMenuGenerator must honour this contract:
         -- no raw SDK error may escape to the caller.
+        --
+        -- The following SDK FinishReason values map to GeneratorError(content_blocked):
+        --   Image model (primary):     IMAGE_SAFETY, IMAGE_PROHIBITED_CONTENT,
+        --                              IMAGE_RECITATION, IMAGE_OTHER, NO_IMAGE
+        --   Text model (defensive):    SAFETY, PROHIBITED_CONTENT, BLOCKLIST, SPII
+        -- These are the 9 values that trigger kind=content_blocked. Text-model values
+        -- are included defensively (they shouldn't fire from generateDishImage, but
+        -- wrap_generator_error maps them anyway for completeness). The impl's
+        -- CONTENT_BLOCKED_FINISH_REASONS set must match this list.
+        -- Verified against @google/genai@2.0.1 FinishReason enum by live probe 2026-05-13.
 }
 
 rule GenerateDishImageAborted {
