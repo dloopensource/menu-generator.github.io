@@ -45,10 +45,15 @@ function Main() {
   const gen = useMenuGenerator();
   const [state, dispatch] = useReducer(menuReducer, initialMenuState);
   const abortRef = useRef<AbortController | null>(null);
+  const cardAbortRef = useRef<Map<string, AbortController>>(new Map());
 
   // Abort any in-flight work on unmount.
   useEffect(() => {
-    return () => abortRef.current?.abort();
+    const cardAborts = cardAbortRef.current;
+    return () => {
+      abortRef.current?.abort();
+      cardAborts.forEach((c) => c.abort());
+    };
   }, []);
 
   const onEdit = useCallback(
@@ -122,9 +127,9 @@ function Main() {
     (id: string) => {
       const card = state.cards.find((c) => c.id === id);
       if (!card) return;
+      cardAbortRef.current.get(id)?.abort();
       const controller = new AbortController();
-      abortRef.current?.abort();
-      abortRef.current = controller;
+      cardAbortRef.current.set(id, controller);
       dispatch({ type: "regenerateCard", id });
       void generateOneCard({ ...card, status: "generating", imageUrl: null }, controller.signal);
     },
