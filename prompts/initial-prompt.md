@@ -31,7 +31,7 @@ item.
 Open the review design files:
 
 1. designs/photo-realistic-menu-generator.png
-2. designs/photo-realistic-menu-generator_standalone_.html
+2. designs/photo-realistic-menu-generator*standalone*.html
 
 Use these as a reference for implementing the user interface of the web app.
 

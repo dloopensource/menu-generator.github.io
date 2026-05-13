@@ -15,7 +15,9 @@ describe("SuggestionChips", () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
     render(<SuggestionChips onPick={onPick} />);
-    await user.click(screen.getByRole("button", { name: SUGGESTIONS[0].label }));
+    await user.click(
+      screen.getByRole("button", { name: SUGGESTIONS[0].label }),
+    );
     expect(onPick).toHaveBeenCalledWith(SUGGESTIONS[0].prompt);
   });
 });

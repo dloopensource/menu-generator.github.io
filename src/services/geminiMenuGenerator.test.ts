@@ -15,7 +15,9 @@ vi.mock("@google/genai", () => {
 import { geminiMenuGenerator } from "./geminiMenuGenerator";
 // Access the mock fn via the namespace import:
 import * as Genai from "@google/genai";
-const generateContent = (Genai as unknown as { __generateContent: ReturnType<typeof vi.fn> }).__generateContent;
+const generateContent = (
+  Genai as unknown as { __generateContent: ReturnType<typeof vi.fn> }
+).__generateContent;
 
 beforeEach(() => {
   generateContent.mockReset();
@@ -34,7 +36,12 @@ describe("geminiMenuGenerator error mapping", () => {
           code: 400,
           message: "API key not valid. Please pass a valid API key.",
           status: "INVALID_ARGUMENT",
-          details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "API_KEY_INVALID" }],
+          details: [
+            {
+              "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+              reason: "API_KEY_INVALID",
+            },
+          ],
         },
       }),
     });
@@ -52,7 +59,11 @@ describe("geminiMenuGenerator error mapping", () => {
       name: "ApiError",
       status: 429,
       message: JSON.stringify({
-        error: { code: 429, message: "You exceeded your current quota.", status: "RESOURCE_EXHAUSTED" },
+        error: {
+          code: 429,
+          message: "You exceeded your current quota.",
+          status: "RESOURCE_EXHAUSTED",
+        },
       }),
     });
     const gen = geminiMenuGenerator("test-key");
@@ -70,18 +81,21 @@ describe("geminiMenuGenerator error mapping", () => {
     "IMAGE_RECITATION",
     "IMAGE_OTHER",
     "NO_IMAGE",
-  ])("maps finishReason %s on the image model to content_blocked", async (reason) => {
-    generateContent.mockResolvedValueOnce({
-      candidates: [{ finishReason: reason, content: { parts: [] } }],
-    });
-    const gen = geminiMenuGenerator("test-key");
-    await expect(
-      gen.generateDishImage(
-        { name: "X", description: "Y" },
-        { signal: new AbortController().signal },
-      ),
-    ).rejects.toMatchObject({ kind: "content_blocked" });
-  });
+  ])(
+    "maps finishReason %s on the image model to content_blocked",
+    async (reason) => {
+      generateContent.mockResolvedValueOnce({
+        candidates: [{ finishReason: reason, content: { parts: [] } }],
+      });
+      const gen = geminiMenuGenerator("test-key");
+      await expect(
+        gen.generateDishImage(
+          { name: "X", description: "Y" },
+          { signal: new AbortController().signal },
+        ),
+      ).rejects.toMatchObject({ kind: "content_blocked" });
+    },
+  );
 
   it("parses JSON from a successful text response (via response.text getter)", async () => {
     // The SDK exposes `response.text` as a getter that concatenates all text

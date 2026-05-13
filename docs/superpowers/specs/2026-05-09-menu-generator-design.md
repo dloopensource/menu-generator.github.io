@@ -81,40 +81,51 @@ A single reducer scoped to `<MenuGenerator>`, plus two tiny independent stores. 
 ```ts
 // src/state/menuReducer.ts
 
-type CardStatus = 'pending' | 'generating' | 'ready' | 'error';
+type CardStatus = "pending" | "generating" | "ready" | "error";
 
 type MenuCard = {
-  id: string;                  // stable uuid for keys + per-card regen
-  category: string;            // editable, may be ''
-  name: string;                // editable, may be ''
-  description: string;         // editable, may be ''
-  price: string;               // editable string ('$25' or ''); not parsed to number
-  imageUrl: string | null;     // object URL of generated Blob
+  id: string; // stable uuid for keys + per-card regen
+  category: string; // editable, may be ''
+  name: string; // editable, may be ''
+  description: string; // editable, may be ''
+  price: string; // editable string ('$25' or ''); not parsed to number
+  imageUrl: string | null; // object URL of generated Blob
   status: CardStatus;
   errorMessage?: string;
 };
 
 type MenuState = {
   prompt: string;
-  referencePhoto: File | null;       // null in text-only flow
-  count: number;                     // 1..8, default 4
-  cards: MenuCard[];                 // length === count once generation runs
-  globalStatus: 'idle' | 'parsing' | 'generating' | 'partial' | 'done' | 'error';
+  referencePhoto: File | null; // null in text-only flow
+  count: number; // 1..8, default 4
+  cards: MenuCard[]; // length === count once generation runs
+  globalStatus:
+    | "idle"
+    | "parsing"
+    | "generating"
+    | "partial"
+    | "done"
+    | "error";
   globalError: string | null;
 };
 
 type MenuAction =
-  | { type: 'setPrompt'; value: string }
-  | { type: 'setReferencePhoto'; file: File | null }
-  | { type: 'setCount'; value: number }
-  | { type: 'startGeneration' }
-  | { type: 'parseSucceeded'; items: ParsedMenuItem[] }
-  | { type: 'cardStarted'; id: string }
-  | { type: 'cardSucceeded'; id: string; imageUrl: string }
-  | { type: 'cardFailed'; id: string; message: string }
-  | { type: 'editCardField'; id: string; field: 'category'|'name'|'description'|'price'; value: string }
-  | { type: 'regenerateCard'; id: string }
-  | { type: 'fail'; message: string };
+  | { type: "setPrompt"; value: string }
+  | { type: "setReferencePhoto"; file: File | null }
+  | { type: "setCount"; value: number }
+  | { type: "startGeneration" }
+  | { type: "parseSucceeded"; items: ParsedMenuItem[] }
+  | { type: "cardStarted"; id: string }
+  | { type: "cardSucceeded"; id: string; imageUrl: string }
+  | { type: "cardFailed"; id: string; message: string }
+  | {
+      type: "editCardField";
+      id: string;
+      field: "category" | "name" | "description" | "price";
+      value: string;
+    }
+  | { type: "regenerateCard"; id: string }
+  | { type: "fail"; message: string };
 ```
 
 Side stores:
@@ -141,40 +152,45 @@ export type ParsedMenuItem = {
 };
 
 export type DishPrompt = {
-  name: string;             // may be empty in text-only flow
-  description: string;      // free text from user OR parsed item
-  styleHint?: string;       // shared across a generation, e.g. "warm overhead plated photo"
+  name: string; // may be empty in text-only flow
+  description: string; // free text from user OR parsed item
+  styleHint?: string; // shared across a generation, e.g. "warm overhead plated photo"
 };
 
 export type GenerateImageOptions = {
-  signal: AbortSignal;      // for per-card cancel + unmount cancel
+  signal: AbortSignal; // for per-card cancel + unmount cancel
 };
 
 export type GeneratorErrorKind =
-  | 'invalid_key'
-  | 'rate_limited'
-  | 'content_blocked'
-  | 'network'
-  | 'unknown';
+  | "invalid_key"
+  | "rate_limited"
+  | "content_blocked"
+  | "network"
+  | "unknown";
 
 export class GeneratorError extends Error {
-  constructor(public kind: GeneratorErrorKind, message: string) { super(message); }
+  constructor(
+    public kind: GeneratorErrorKind,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 export interface MenuGenerator {
   parseMenuFromText(
     prompt: string,
-    opts: { signal: AbortSignal }
+    opts: { signal: AbortSignal },
   ): Promise<ParsedMenuItem[]>;
 
   parseMenuFromImage(
     file: File,
-    opts: { signal: AbortSignal }
+    opts: { signal: AbortSignal },
   ): Promise<ParsedMenuItem[]>;
 
   generateDishImage(
     input: DishPrompt,
-    opts: GenerateImageOptions
+    opts: GenerateImageOptions,
   ): Promise<Blob>;
 }
 ```
@@ -205,10 +221,10 @@ export interface MenuGenerator {
 
 ```tsx
 // src/services/MenuGeneratorProvider.tsx
-const isFake = new URLSearchParams(location.search).has('fake');
+const isFake = new URLSearchParams(location.search).has("fake");
 const generator = useMemo(
   () => (isFake ? fakeMenuGenerator() : geminiMenuGenerator(apiKey!)),
-  [isFake, apiKey]
+  [isFake, apiKey],
 );
 ```
 
@@ -265,13 +281,13 @@ Vitest + React Testing Library + `@testing-library/user-event`. No e2e in v1.
 
 Layered tests, mirroring the spec layout:
 
-| Layer | Lives in | Covers |
-|---|---|---|
-| Reducer | `src/state/menuReducer.test.ts` | Pure state transitions: every action, partial-failure shape, regenerate-card resets one card's status, count change resizes `cards[]`. |
-| Service contract | `src/services/menuGenerator.contract.test.ts` | Parametrized over both impls. Asserts the interface contract: parse returns `ParsedMenuItem[]`, generate returns a `Blob`, errors are typed. Real impl runs against a mocked `@google/genai` (one focused mock, in this file only). |
-| Hook | `src/hooks/useApiKey.test.ts` | localStorage round-trip, clear, missing-key initial state. |
-| Component | `src/components/*.test.tsx` | Render + interact via `user-event`. Each component test injects a stub generator that returns whatever the test needs. |
-| Flow | `src/__tests__/flows/text-only.test.tsx`, `upload.test.tsx` | Whole-app render with `<MenuGeneratorProvider value={fake}>`. Drives the two user journeys end-to-end through the UI, asserting card states transition `pending → generating → ready`. |
+| Layer            | Lives in                                                    | Covers                                                                                                                                                                                                                              |
+| ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reducer          | `src/state/menuReducer.test.ts`                             | Pure state transitions: every action, partial-failure shape, regenerate-card resets one card's status, count change resizes `cards[]`.                                                                                              |
+| Service contract | `src/services/menuGenerator.contract.test.ts`               | Parametrized over both impls. Asserts the interface contract: parse returns `ParsedMenuItem[]`, generate returns a `Blob`, errors are typed. Real impl runs against a mocked `@google/genai` (one focused mock, in this file only). |
+| Hook             | `src/hooks/useApiKey.test.ts`                               | localStorage round-trip, clear, missing-key initial state.                                                                                                                                                                          |
+| Component        | `src/components/*.test.tsx`                                 | Render + interact via `user-event`. Each component test injects a stub generator that returns whatever the test needs.                                                                                                              |
+| Flow             | `src/__tests__/flows/text-only.test.tsx`, `upload.test.tsx` | Whole-app render with `<MenuGeneratorProvider value={fake}>`. Drives the two user journeys end-to-end through the UI, asserting card states transition `pending → generating → ready`.                                              |
 
 **TDD discipline (per starter plan and CLAUDE.md):** every spec gets failing tests first (via `allium:propagate` where it can, hand-written for UI specifics where it can't), then implementation turns them green. The first PR contains only `vitest.config.ts`, the test setup file, and one trivial smoke test that proves the harness works — no app code.
 
@@ -362,18 +378,18 @@ No new top-level config files beyond `vitest.config.ts`. Existing TS / ESLint / 
 > 1. **Find or create the task.** Check the board for a task that matches the exact unit of work it is about to do (using the title patterns in 8.3 / 8.4). If one exists, self-assign it. If none exists, the agent **creates** it in the **Backlog** column with: title per the patterns below, description, links per 8.5 (Allium spec, design-doc anchor, test path, production path), assignee = the agent itself, blocking-task references where applicable.
 > 2. **Verify blockers are `Done`.** A `Tests: <feature>` task is blocked by its `Spec: <feature>` task; an `Implement: <feature>` task is blocked by its `Tests: <feature>` task. If a blocker is not yet `Done`, the task stays in `Backlog` and the agent raises the blocker rather than starting.
 > 3. **Move to `Ready`** once all blockers are `Done`.
-> 4. **Move to `In progress`** as the first action of the working session, *before* the first commit or file write.
+> 4. **Move to `In progress`** as the first action of the working session, _before_ the first commit or file write.
 > 5. **Move to `In review`** when the PR is opened. **`Done`** is set on merge by the merging agent.
 >
 > "Tasks are someone else's job to file" is wrong. The agent doing the work is the agent who creates, assigns, and moves the task. This rule applies equally to feature work (8.3), infra work (8.4), and `code-health` follow-ups.
 
 ### 8.1 Agents and ownership
 
-| Agent | Owns |
-|---|---|
-| `allium:tend` (with `allium:propagate`, `allium:weed`) | Writes and maintains Allium specs in `specs/`. Generates failing test skeletons via `propagate`. Audits alignment via `weed` before merge. |
-| `test-engineer` | Writes all Vitest test code: completes propagated skeletons, fills in RTL / `user-event` interactions, writes contract tests, writes flow tests. Owns `vitest.config.ts`, `src/__tests__/setup.ts`, and every `*.test.ts(x)` file. **Does not write production code.** |
-| `frontend-engineer` | Writes all production code: components, hooks, reducers, services, styles. Implements until the failing tests go green. Owns everything under `src/` that is **not** a test file. **Does not author tests** (may run them and report failures, but extending or modifying tests goes back to test-engineer). |
+| Agent                                                  | Owns                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `allium:tend` (with `allium:propagate`, `allium:weed`) | Writes and maintains Allium specs in `specs/`. Generates failing test skeletons via `propagate`. Audits alignment via `weed` before merge.                                                                                                                                                                   |
+| `test-engineer`                                        | Writes all Vitest test code: completes propagated skeletons, fills in RTL / `user-event` interactions, writes contract tests, writes flow tests. Owns `vitest.config.ts`, `src/__tests__/setup.ts`, and every `*.test.ts(x)` file. **Does not write production code.**                                       |
+| `frontend-engineer`                                    | Writes all production code: components, hooks, reducers, services, styles. Implements until the failing tests go green. Owns everything under `src/` that is **not** a test file. **Does not author tests** (may run them and report failures, but extending or modifying tests goes back to test-engineer). |
 
 **Review agents** sit between the implementer and merge. Every PR runs both before merge:
 
@@ -408,11 +424,11 @@ Every Allium spec follows the same phased lifecycle. Every phase ends with a mer
 
 Each Allium spec yields **three linked Project tasks**, in this order. **Each task is created in `Backlog` by the agent in the "Owner / created by" column**, per the precondition at the top of Section 8 — the owner self-assigns at creation and walks the task through the columns as it works:
 
-| Task title pattern | Owner / created by | Blocks | Definition of done |
-|---|---|---|---|
-| `Spec: <feature>` | `allium:tend` | the two below | `specs/<feature>.allium` committed; `allium check` passes; propagated skeletons emitted; PR opened to `implement-menu-gen`, reviewed by `code-health` + `allium:weed`, and **merged** |
-| `Tests: <feature>` | `test-engineer` | the impl task below | All test files for the feature exist and fail with informative messages; no `.skip` / `xfail`; PR description quotes the failing output; PR opened, reviewed by `code-health` (+ `allium:weed` where the file binds to a spec), and **merged** |
-| `Implement: <feature>` | `frontend-engineer` | next spec's impl, if dependent | All tests for the feature pass; `npm run lint` clean; PR opened, `code-health` approves, `allium:weed` reports no drift, and the PR is **merged** into `implement-menu-gen` |
+| Task title pattern     | Owner / created by  | Blocks                         | Definition of done                                                                                                                                                                                                                             |
+| ---------------------- | ------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Spec: <feature>`      | `allium:tend`       | the two below                  | `specs/<feature>.allium` committed; `allium check` passes; propagated skeletons emitted; PR opened to `implement-menu-gen`, reviewed by `code-health` + `allium:weed`, and **merged**                                                          |
+| `Tests: <feature>`     | `test-engineer`     | the impl task below            | All test files for the feature exist and fail with informative messages; no `.skip` / `xfail`; PR description quotes the failing output; PR opened, reviewed by `code-health` (+ `allium:weed` where the file binds to a spec), and **merged** |
+| `Implement: <feature>` | `frontend-engineer` | next spec's impl, if dependent | All tests for the feature pass; `npm run lint` clean; PR opened, `code-health` approves, `allium:weed` reports no drift, and the PR is **merged** into `implement-menu-gen`                                                                    |
 
 **Column lifecycle (per CLAUDE.md):** `Backlog` (just created, may have unmet blockers) → `Ready` (all blockers `Done`) → `In progress` (work has started; transition is the agent's first action of the session, also the moment the per-task branch is cut) → `In review` (PR opened against `implement-menu-gen`) → `Done` (PR merged after `code-health` and `allium:weed` both approve). The owning agent owns every transition; no other agent moves the task on its behalf. **A task is not `Done` until its PR is merged** — local commits without a merged PR keep the task in `In review`.
 
@@ -420,11 +436,11 @@ Each Allium spec yields **three linked Project tasks**, in this order. **Each ta
 
 These have no Allium spec — pure setup. Same rule: the listed owner creates the task in `Backlog`, self-assigns, and walks it through the columns. Where two owners are listed, each creates and walks its own sibling task and the two are linked as blockers of each other where appropriate.
 
-| Task | Owner(s) / created by | Notes |
-|---|---|---|
-| `Infra: test harness` | `frontend-engineer` (deps + config) + `test-engineer` (smoke test) | `vitest.config.ts`, `src/__tests__/setup.ts`, devDep installs. Done before any feature spec begins. |
-| `Infra: design tokens` | `frontend-engineer` | `src/styles/tokens.css`, `src/styles/reset.css`. No spec; visual diff against the mockup is the acceptance. |
-| `Infra: MenuGeneratorProvider wiring + ?fake=true` | `frontend-engineer` | Mounts `<MenuGeneratorProvider>` and the URL-flag swap; tests-side covered by the contract test. |
+| Task                                               | Owner(s) / created by                                              | Notes                                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `Infra: test harness`                              | `frontend-engineer` (deps + config) + `test-engineer` (smoke test) | `vitest.config.ts`, `src/__tests__/setup.ts`, devDep installs. Done before any feature spec begins.         |
+| `Infra: design tokens`                             | `frontend-engineer`                                                | `src/styles/tokens.css`, `src/styles/reset.css`. No spec; visual diff against the mockup is the acceptance. |
+| `Infra: MenuGeneratorProvider wiring + ?fake=true` | `frontend-engineer`                                                | Mounts `<MenuGeneratorProvider>` and the URL-flag swap; tests-side covered by the contract test.            |
 
 ### 8.5 Spec → task → file traceability
 
@@ -435,7 +451,7 @@ Every Project task description (all three rows of Section 8.3) links to:
 3. The test file path (`src/.../<feature>.test.*`).
 4. The production file path (`src/.../<feature>.ts(x)`).
 
-Opening any Project task answers the questions: *what spec does this implement, what tests prove it, which files change, which PR landed it.*
+Opening any Project task answers the questions: _what spec does this implement, what tests prove it, which files change, which PR landed it._
 
 ### 8.6 Git workflow and PR review
 
@@ -473,10 +489,10 @@ main                    (production — GitHub Pages serves the build of this br
 
 **Reviewer dispatch responsibilities:**
 
-| Reviewer | Required on | Looks for | Approval signal |
-|---|---|---|---|
-| `code-health` | Every PR | Tech debt, oversized files, weak tests, stale docs, redundant patterns, naming, clarity | ✅ comment with no Important / Critical findings |
-| `allium:weed` | PRs that touch `specs/*.allium` or any code referenced by a spec | Drift between Allium rules and the actual code or tests | ✅ comment "no drift" |
+| Reviewer      | Required on                                                      | Looks for                                                                               | Approval signal                                  |
+| ------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `code-health` | Every PR                                                         | Tech debt, oversized files, weak tests, stale docs, redundant patterns, naming, clarity | ✅ comment with no Important / Critical findings |
+| `allium:weed` | PRs that touch `specs/*.allium` or any code referenced by a spec | Drift between Allium rules and the actual code or tests                                 | ✅ comment "no drift"                            |
 
 **Block-until-merged enforcement:** the controller MUST NOT dispatch the next task's implementer until the prior task's PR is merged and `implement-menu-gen` is updated locally. Two consequences:
 
@@ -526,7 +542,7 @@ Add `docs/diagrams/` to the project layout in Section 7 when materializing the i
 
 Documentation is part of "done," not a follow-up:
 
-- **`Spec: <feature>` task (owner `allium:tend`)** authors the *initial* draft of any sequence diagram(s) covering the spec's behavior, in `docs/diagrams/*.md`. The same precondition rules from Section 8 apply — the agent creates and self-assigns the task in `Backlog`.
+- **`Spec: <feature>` task (owner `allium:tend`)** authors the _initial_ draft of any sequence diagram(s) covering the spec's behavior, in `docs/diagrams/*.md`. The same precondition rules from Section 8 apply — the agent creates and self-assigns the task in `Backlog`.
 - **`Implement: <feature>` task (owner `frontend-engineer`)** updates the diagram if the implementation revealed a real, intentional deviation from the drafted flow (e.g. an extra retry step that didn't exist in the draft). Pure refactors that don't change the user-visible sequence do not change the diagram.
 - **`allium:weed`** treats stale diagrams as drift: if the diagram disagrees with the code, `weed` reports it and blocks merge until either the code or the diagram is updated.
 

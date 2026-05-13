@@ -1,0 +1,23 @@
+.zone {
+  border: 1px dashed var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 76px;
+}
+.label { color: var(--color-ink-soft); font-size: 0.9rem; }
+.browse { color: var(--color-accent); text-decoration: underline; cursor: pointer; }
+.file { display: flex; align-items: center; gap: var(--space-3); width: 100%; }
+.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); }
+.name { font-size: 0.9rem; }
+.remove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--color-ink-mute);
+  text-decoration: underline;
+}
+.hidden { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }

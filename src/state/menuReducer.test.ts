@@ -2,11 +2,17 @@ import { describe, it, expect } from "vitest";
 import { menuReducer } from "./menuReducer";
 import { initialMenuState, type MenuState, type MenuCard } from "./types";
 
-function withCards(overrides: Partial<MenuState>, cards: MenuCard[]): MenuState {
+function withCards(
+  overrides: Partial<MenuState>,
+  cards: MenuCard[],
+): MenuState {
   return { ...initialMenuState, ...overrides, cards };
 }
 
-function makeCard(id: string, status: MenuCard["status"] = "pending"): MenuCard {
+function makeCard(
+  id: string,
+  status: MenuCard["status"] = "pending",
+): MenuCard {
   return {
     id,
     category: "",
@@ -20,14 +26,23 @@ function makeCard(id: string, status: MenuCard["status"] = "pending"): MenuCard 
 
 describe("menuReducer", () => {
   it("setPrompt updates the prompt", () => {
-    const next = menuReducer(initialMenuState, { type: "setPrompt", value: "hi" });
+    const next = menuReducer(initialMenuState, {
+      type: "setPrompt",
+      value: "hi",
+    });
     expect(next.prompt).toBe("hi");
   });
 
   it("setCount clamps to [1, 8]", () => {
-    expect(menuReducer(initialMenuState, { type: "setCount", value: 0 }).count).toBe(1);
-    expect(menuReducer(initialMenuState, { type: "setCount", value: 99 }).count).toBe(8);
-    expect(menuReducer(initialMenuState, { type: "setCount", value: 4 }).count).toBe(4);
+    expect(
+      menuReducer(initialMenuState, { type: "setCount", value: 0 }).count,
+    ).toBe(1);
+    expect(
+      menuReducer(initialMenuState, { type: "setCount", value: 99 }).count,
+    ).toBe(8);
+    expect(
+      menuReducer(initialMenuState, { type: "setCount", value: 4 }).count,
+    ).toBe(4);
   });
 
   it("parseSucceeded pads to count with blank items and sets globalStatus=generating", () => {
@@ -93,7 +108,11 @@ describe("menuReducer", () => {
       makeCard("a", "generating"),
       makeCard("b", "generating"),
     ]);
-    const a = menuReducer(state, { type: "cardSucceeded", id: "a", imageUrl: "u" });
+    const a = menuReducer(state, {
+      type: "cardSucceeded",
+      id: "a",
+      imageUrl: "u",
+    });
     const b = menuReducer(a, { type: "cardFailed", id: "b", message: "x" });
     expect(b.globalStatus).toBe("partial");
   });

@@ -83,7 +83,8 @@ async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
   const bytes = new Uint8Array(buf);
   let bin = "";
-  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.byteLength; i++)
+    bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
 }
 
@@ -173,9 +174,15 @@ export function geminiMenuGenerator(apiKey: string): MenuGenerator {
           (p: unknown) => (p as { inlineData?: unknown }).inlineData,
         ) as { inlineData?: { mimeType: string; data: string } } | undefined;
         if (!part?.inlineData?.data) {
-          throw new GeneratorError("unknown", "Image response contained no inline data.");
+          throw new GeneratorError(
+            "unknown",
+            "Image response contained no inline data.",
+          );
         }
-        return base64ToBlob(part.inlineData.data, part.inlineData.mimeType ?? "image/png");
+        return base64ToBlob(
+          part.inlineData.data,
+          part.inlineData.mimeType ?? "image/png",
+        );
       } catch (err) {
         throw mapError(err);
       }

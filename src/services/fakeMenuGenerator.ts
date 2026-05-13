@@ -9,19 +9,22 @@ const MOCKUP_ITEMS: ParsedMenuItem[] = [
   {
     category: "PASTA",
     name: "Rigatoni all'Amatriciana",
-    description: "Slow-stewed sun marzano, crisped guanciale, a whisper of chili.",
+    description:
+      "Slow-stewed sun marzano, crisped guanciale, a whisper of chili.",
     price: "$25",
   },
   {
     category: "MAIN",
     name: "Branzino in Cartoccio",
-    description: "Whole branzino baked in parchment, fennel, taggiasche olives.",
+    description:
+      "Whole branzino baked in parchment, fennel, taggiasche olives.",
     price: "$38",
   },
   {
     category: "ANTIPASTO",
     name: "Burrata di Andria",
-    description: "Fior-di-latte cream, late-summer tomato, basil oil, sourdough.",
+    description:
+      "Fior-di-latte cream, late-summer tomato, basil oil, sourdough.",
     price: "$18",
   },
   {
