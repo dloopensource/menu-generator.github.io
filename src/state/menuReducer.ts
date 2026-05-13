@@ -6,7 +6,10 @@ const clamp = (n: number, lo: number, hi: number) =>
 
 function reconcileGlobalStatus(cards: MenuCard[]): MenuState["globalStatus"] {
   const active = cards.filter((c) => c.name !== "" || c.description !== "");
-  if (active.length === 0) return "idle";
+  // Empty active set: vacuously "done" (zero items, all-non-blank-ready holds).
+  // Spec menu-generation.allium#GlobalStatusReconciliation requires no
+  // generating -> idle transition, so we never emit "idle" from reconciliation.
+  if (active.length === 0) return "done";
   if (active.some((c) => c.status === "generating" || c.status === "pending")) {
     return "generating";
   }

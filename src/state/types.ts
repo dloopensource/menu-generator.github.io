@@ -32,7 +32,7 @@ export type MenuAction =
   | { type: "setPrompt"; value: string }
   | { type: "setReferencePhoto"; file: File | null }
   | { type: "setCount"; value: number }
-  | { type: "startGeneration"; ids: string[] }
+  | { type: "startGeneration" }
   | {
       type: "parseSucceeded";
       items: { category: string; name: string; description: string; price: string }[];
