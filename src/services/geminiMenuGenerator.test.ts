@@ -5,9 +5,9 @@ import { GeneratorError } from "./menuGenerator";
 vi.mock("@google/genai", () => {
   const generateContent = vi.fn();
   return {
-    GoogleGenAI: vi.fn().mockImplementation(() => ({
-      models: { generateContent },
-    })),
+    GoogleGenAI: vi.fn(function () {
+      return { models: { generateContent } };
+    }),
     __generateContent: generateContent,
   };
 });
