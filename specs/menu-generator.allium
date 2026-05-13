@@ -77,8 +77,8 @@ entity MenuItem {
         pending -> generating
         generating -> ready
         generating -> error
+        ready -> generating
         error -> generating
-        terminal: ready
     }
 }
 
