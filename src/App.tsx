@@ -1,121 +1,150 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
-import heroImg from "./assets/hero.png";
-import "./App.css";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { MenuGeneratorProvider } from "./services/MenuGeneratorProvider";
+import { fakeMenuGenerator } from "./services/fakeMenuGenerator";
+import { geminiMenuGenerator } from "./services/geminiMenuGenerator";
+import type { MenuGenerator, ParsedMenuItem } from "./services/menuGenerator";
+import { GeneratorError } from "./services/menuGenerator";
+import { ApiKeyGate } from "./components/ApiKeyGate";
+import { Header } from "./components/Header";
+import { PromptForm, type GenerateRequest } from "./components/PromptForm";
+import { MenuGrid } from "./components/MenuGrid";
+import { ErrorBanner } from "./components/ErrorBanner";
+import { useApiKey } from "./hooks/useApiKey";
+import { menuReducer } from "./state/menuReducer";
+import { initialMenuState } from "./state/types";
+import type { MenuCard } from "./state/types";
+
+function useMenuGenerator(): MenuGenerator {
+  const { apiKey } = useApiKey();
+  const isFake = new URLSearchParams(window.location.search).has("fake");
+  return useMemo(
+    () => (isFake || !apiKey ? fakeMenuGenerator() : geminiMenuGenerator(apiKey)),
+    [isFake, apiKey],
+  );
+}
 
 function App() {
-  const [count, setCount] = useState(0);
+  return (
+    <ApiKeyGate>
+      <Shell />
+    </ApiKeyGate>
+  );
+}
+
+function Shell() {
+  const gen = useMenuGenerator();
+  return (
+    <MenuGeneratorProvider value={gen}>
+      <Header />
+      <Main />
+    </MenuGeneratorProvider>
+  );
+}
+
+function Main() {
+  const gen = useMenuGenerator();
+  const [state, dispatch] = useReducer(menuReducer, initialMenuState);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Abort any in-flight work on unmount.
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
+  const onEdit = useCallback(
+    (id: string, field: "category" | "name" | "description" | "price", value: string) =>
+      dispatch({ type: "editCardField", id, field, value }),
+    [],
+  );
+
+  const generateOneCard = useCallback(
+    async (card: MenuCard, signal: AbortSignal) => {
+      if (card.name === "" && card.description === "") return;
+      dispatch({ type: "cardStarted", id: card.id });
+      try {
+        const blob = await gen.generateDishImage(
+          { name: card.name, description: card.description },
+          { signal },
+        );
+        const url = URL.createObjectURL(blob);
+        dispatch({ type: "cardSucceeded", id: card.id, imageUrl: url });
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        const message =
+          err instanceof GeneratorError ? err.message : "Failed to generate image.";
+        dispatch({ type: "cardFailed", id: card.id, message });
+      }
+    },
+    [gen],
+  );
+
+  const onGenerate = useCallback(
+    async (req: GenerateRequest) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      dispatch({ type: "startGeneration" });
+
+      let items: ParsedMenuItem[];
+      try {
+        items = req.referencePhoto
+          ? await gen.parseMenuFromImage(req.referencePhoto, { signal: controller.signal })
+          : await gen.parseMenuFromText(req.prompt, { signal: controller.signal });
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        const message =
+          err instanceof GeneratorError ? err.message : "Failed to parse menu input.";
+        dispatch({ type: "fail", message });
+        return;
+      }
+
+      dispatch({ type: "parseSucceeded", items });
+      // Per-card image generation fan-out is driven by the useEffect below
+      // watching state.globalStatus === "generating".
+    },
+    [gen],
+  );
+
+  // Drive per-card image generation off changes to cards. Fires when
+  // parseSucceeded transitions globalStatus to "generating".
+  useEffect(() => {
+    if (state.globalStatus !== "generating") return;
+    const controller = abortRef.current;
+    if (!controller) return;
+    const inFlight = state.cards.filter((c) => c.status === "generating");
+    inFlight.forEach((card) => {
+      void generateOneCard(card, controller.signal);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.globalStatus]);
+
+  const onRegenerate = useCallback(
+    (id: string) => {
+      const card = state.cards.find((c) => c.id === id);
+      if (!card) return;
+      const controller = new AbortController();
+      abortRef.current?.abort();
+      abortRef.current = controller;
+      dispatch({ type: "regenerateCard", id });
+      void generateOneCard({ ...card, status: "generating", imageUrl: null }, controller.signal);
+    },
+    [generateOneCard, state.cards],
+  );
+
+  const isGenerating =
+    state.globalStatus === "parsing" || state.globalStatus === "generating";
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <main>
+      <PromptForm
+        count={state.count}
+        onCountChange={(n) => dispatch({ type: "setCount", value: n })}
+        onGenerate={onGenerate}
+        isGenerating={isGenerating}
+      />
+      <ErrorBanner message={state.globalError} />
+      <MenuGrid cards={state.cards} onEdit={onEdit} onRegenerate={onRegenerate} />
+    </main>
   );
 }
 
