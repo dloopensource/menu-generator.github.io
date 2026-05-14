@@ -126,6 +126,11 @@ rule FanOutGeneration {
         -- structured menu data and none were requested). In that case no MenuItem
         -- entities are created and the generation moves to generating with zero
         -- items. GlobalStatusReconciliation will immediately resolve this as done.
+        -- Implementation note: the reducer creates each MenuItem at `generating` status
+        -- directly (not pending → generating), as an atomic optimisation. The
+        -- `pending → generating` graph edge remains valid for blank items that the
+        -- user later fills in and regenerates. See src/state/menuReducer.ts case
+        -- `parseSucceeded`.
 }
 
 -- Flow: Global status reconciliation after each card outcome
@@ -225,7 +230,6 @@ rule RegenerateSingleCard {
     when: OnRegenerateCard(id)
     let item = umbrella/MenuItem{id: id}
     requires: exists item
-    requires: item.status in {error, pending, ready}
     requires: item.name != "" or item.description != ""
     ensures:
         item.status = generating
@@ -233,6 +237,9 @@ rule RegenerateSingleCard {
         item.generation.global_status = generating
 
     @guidance
+        -- Regenerate is permitted from any MenuItem.status (pending, generating, ready, error).
+        -- The umbrella's transitions {pending,ready,error} → generating cover the legal targets.
+        -- Cards in `generating` may be re-targeted (effectively a no-op or abort+restart).
         -- Clearing image_url prevents a stale image from showing while the new
         -- one is being generated. The generation's global_status is forced to
         -- generating unconditionally: since this card is now in flight, the
@@ -243,9 +250,8 @@ rule RegenerateSingleCard {
         -- must disable the ↻ button for blank cards so users never see the
         -- trigger rejected.
         -- The umbrella's RegenerateCard rule covers the same trigger. This rule
-        -- adds the widened status guard (error, pending, ready), the blank-item
-        -- guard, the image_url clearing, and the global_status side-effect.
-        -- Implementations combine both rule bodies atomically.
+        -- adds the blank-item guard, the image_url clearing, and the
+        -- global_status side-effect. Implementations combine both rule bodies atomically.
 }
 
 -- Flow: Inline card field editing
