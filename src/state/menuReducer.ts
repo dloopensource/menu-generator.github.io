@@ -1,5 +1,6 @@
 import type { MenuAction, MenuCard, MenuState } from "./types";
 import { initialMenuState } from "./types";
+import { MIN_COUNT, MAX_COUNT } from "./constants";
 
 const clamp = (n: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, n));
@@ -40,7 +41,7 @@ export function menuReducer(state: MenuState, action: MenuAction): MenuState {
     case "setPrompt":
       return { ...state, prompt: action.value };
     case "setCount":
-      return { ...state, count: clamp(action.value, 1, 8) };
+      return { ...state, count: clamp(action.value, MIN_COUNT, MAX_COUNT) };
     case "startGeneration":
       return {
         ...state,

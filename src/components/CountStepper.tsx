@@ -1,10 +1,11 @@
+import { MIN_COUNT, MAX_COUNT } from "../state/constants";
 import styles from "./CountStepper.module.css";
 
 export function CountStepper({
   value,
   onChange,
-  min = 1,
-  max = 8,
+  min = MIN_COUNT,
+  max = MAX_COUNT,
 }: {
   value: number;
   onChange: (next: number) => void;
