@@ -209,53 +209,8 @@ rule ParseFailed {
         generation.error_message = message
 }
 
--- Flow: Global status resolution after per-item image generation
-
-rule AllItemsSucceeded {
-    -- Generation is done when no items remain in generating or error.
-    when: generation: Generation.global_status transitions_to generating
-    requires:
-        generation.global_status = generating
-        and generation.failed_items.count = 0
-        and generation.generating_items.count = 0
-    ensures:
-        generation.global_status = done
-}
-
-rule SomeItemsSucceeded {
-    -- Generation is partial when some items succeeded and some failed.
-    when: generation: Generation.global_status transitions_to generating
-    requires:
-        generation.global_status = generating
-        and generation.ready_items.count > 0
-        and generation.failed_items.count > 0
-        and generation.generating_items.count = 0
-    ensures:
-        generation.global_status = partial
-}
-
-rule AllItemsFailed {
-    -- Generation is error when all items failed.
-    when: generation: Generation.global_status transitions_to generating
-    requires:
-        generation.global_status = generating
-        and generation.ready_items.count = 0
-        and generation.failed_items.count > 0
-        and generation.generating_items.count = 0
-    ensures:
-        generation.global_status = error
-}
-
-rule PartialBecomesComplete {
-    -- Partial generation becomes done once the last remaining card succeeds.
-    when: generation: Generation.global_status transitions_to partial
-    requires:
-        generation.global_status = partial
-        and generation.generating_items.count = 0
-        and generation.failed_items.count = 0
-    ensures:
-        generation.global_status = done
-}
+-- Reconciliation rules now live in menu-generation.allium#GlobalStatusReconciliation.
+-- This umbrella spec only declares the GlobalStatus enum + transition graph.
 
 -- Flow: Per-item image generation status transitions
 
