@@ -72,14 +72,17 @@ export function fakeMenuGenerator(): MenuGenerator {
     async generateDishImage(input: DishPrompt, opts: GenerateImageOptions) {
       await delay(jitter(600, 1200), opts.signal);
       const seed = hashString(`${input.name}|${input.description}`);
-      // Synthetic Blob placeholder: deterministic per input, same-realm, no network.
-      const bytes = new Uint8Array(1024);
-      let s = seed || 1;
-      for (let i = 0; i < bytes.length; i++) {
-        s = (s * 9301 + 49297) % 233280;
-        bytes[i] = s & 0xff;
-      }
-      return new Blob([bytes], { type: "image/png" });
+      const hue = seed % 360;
+      const label = (input.name || "Generated dish")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480">` +
+        `<rect width="100%" height="100%" fill="hsl(${hue}, 55%, 65%)"/>` +
+        `<text x="50%" y="50%" font-family="Georgia, serif" font-size="36" ` +
+        `fill="white" text-anchor="middle" dominant-baseline="middle">${label}</text>` +
+        `</svg>`;
+      return new Blob([svg], { type: "image/svg+xml" });
     },
   };
 }
