@@ -142,6 +142,13 @@ surface ReferencePhotoDropzone {
 
 open question "File object properties — the spec treats File.name and File.mime_type as opaque properties read from the browser API. Should these be validated at the surface boundary, or does the browser guarantee accuracy of the mime_type field?"
 
-open question "Drag-and-drop vs file input equivalence — the spec states that drag-and-drop and file input produce the same result. Does this include the same File object reference, or only equivalent observable state? If File objects differ, should the spec distinguish them?"
+-- Resolved (2026-05-14): Drag-and-drop vs file input equivalence — both routes
+-- funnel through handlePick(f) in src/components/ReferencePhotoDropzone.tsx.
+-- Identical MIME validation and identical onFileChange(File | null) emission
+-- are applied regardless of how the file was selected. The spec's claim that
+-- both inputs produce the same observable result is confirmed. No spec change
+-- required; the File object identity may differ between paths but the
+-- observable state (ReferencePhoto entity created with same mime_type) is
+-- identical in all cases.
 
 open question "Error reporting on rejection — when a file is rejected due to invalid MIME type, should the surface provide user feedback (error message, toast), or is rejection silent? Currently the spec does not address error reporting."
