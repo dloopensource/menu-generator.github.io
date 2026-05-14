@@ -273,6 +273,8 @@ git commit -m "add vitest + RTL test harness and smoke test"
 
 PR title: `Infra: test harness`. PR body links the design doc §8.4 anchor. After CI-equivalent (`npm run lint && npm run test:run`) is green, merge and move the Project task to `Done`.
 
+**Note on GitHub Pages base path:** `vite.config.ts` must set `base: "/menu-generator.github.io/"` for production builds. Without it, asset URLs in `dist/index.html` are absolute (`/assets/...`) and 404 when served at the repository subpath. This is verified and fixed separately.
+
 ---
 
 ## Task 2 — Infra: design tokens and reset
@@ -4142,7 +4144,13 @@ npm run test:run
 npm run build
 ```
 
-Expected: all clean.
+Expected: all clean. After build, verify `dist/index.html` references `/menu-generator.github.io/assets/...` (not `/assets/...`):
+
+```bash
+grep -E 'src=".*assets/|href=".*assets/' dist/index.html | head -2
+```
+
+Should show `/menu-generator.github.io/assets/...` in all asset paths.
 
 - [ ] **Step 4: Manual QA matrix**
 
