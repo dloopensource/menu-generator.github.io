@@ -338,7 +338,6 @@ surface PromptForm {
 
     provides:
         OnGenerateMenu(request: MenuItemRequest)
-        OnSetApiKey(key)
         OnClearApiKey()
 
     @guidance
@@ -348,7 +347,8 @@ surface PromptForm {
         -- The reference photo dropzone accepts image/png and image/jpeg only.
         -- Presence of a reference photo suppresses text-prompt parsing (Flow B).
         -- A small "Change API key" link at the bottom of the form provides
-        -- OnSetApiKey without navigating away.
+        -- OnClearApiKey; the user re-enters their key via the ApiKeyGate
+        -- after the existing key is cleared.
 }
 
 surface MenuGrid {
@@ -393,17 +393,14 @@ surface GeneratorServiceCallbacks {
     provides:
         OnParseSucceeded(generation, items: List<ParsedMenuItem>)
         OnParseFailed(generation, message: String)
-        OnDishImageReady(item_id, image_blob)
-        OnDishImageFailed(item_id, error)
 
     @guidance
         -- Full trigger semantics and the service-side contract are specified
         -- in generator-service.allium. This surface declares the entry points
         -- so that ParseComplete and ParseFailed rules have a reachable trigger.
-        -- OnDishImageReady and OnDishImageFailed represent the resolution and
-        -- rejection of a generateDishImage Promise, not separate message-bus
-        -- events. Implementations use async/await on the Promise directly;
-        -- no event-bus is required.
+        -- Dish image completion is handled inside App.tsx#generateOneCard via
+        -- Promise await; success/failure dispatches the cardSucceeded/cardFailed
+        -- reducer actions. No surface-level triggers are emitted.
 }
 
 ------------------------------------------------------------

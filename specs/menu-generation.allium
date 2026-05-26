@@ -136,10 +136,13 @@ rule FanOutGeneration {
 -- Flow: Global status reconciliation after each card outcome
 
 rule OnCardSucceeded {
-    -- Fired by the image generation service when a dish image has been produced
-    -- for a specific card. The card's status and image_url are updated, then
-    -- GlobalStatusReconciliation fires to recompute the generation's overall status.
-    when: OnDishImageReady(id, blob: svc/ImageBlob)
+    -- Fired when the in-process generateDishImage Promise for a specific card
+    -- resolves with an image blob. The card's status and image_url are updated,
+    -- then GlobalStatusReconciliation fires to recompute the generation's
+    -- overall status. This is an internal continuation, not a surface event:
+    -- see App.tsx#generateOneCard which awaits the Promise and dispatches the
+    -- cardSucceeded reducer action.
+    when: CardSucceeded(id, blob: svc/ImageBlob)
     let item = umbrella/MenuItem{id: id}
     requires: exists item
     requires: item.status = generating
@@ -151,13 +154,18 @@ rule OnCardSucceeded {
     @guidance
         -- create_object_url is a black box wrapping URL.createObjectURL.
         -- The resulting URL is a Blob object URL valid for the lifetime of the page.
+        -- CardSucceeded is an internal trigger emitted by the orchestrator after
+        -- awaiting the generateDishImage Promise. No surface provides it; no
+        -- event bus is involved.
 }
 
 rule OnCardFailed {
-    -- Fired by the image generation service when dish image generation failed
-    -- for a specific card. The card's status is set to error, then
-    -- GlobalStatusReconciliation fires.
-    when: OnDishImageFailed(id, error: String)
+    -- Fired when the in-process generateDishImage Promise for a specific card
+    -- rejects. The card's status is set to error, then GlobalStatusReconciliation
+    -- fires. This is an internal continuation, not a surface event: see
+    -- App.tsx#generateOneCard which catches the rejection and dispatches the
+    -- cardFailed reducer action.
+    when: CardFailed(id, error: String)
     let item = umbrella/MenuItem{id: id}
     requires: exists item
     requires: item.status = generating
@@ -166,10 +174,12 @@ rule OnCardFailed {
         GlobalStatusReconciliation(generation: item.generation)
 
     @guidance
-        -- The error message is available from the GeneratorError delivered by
-        -- the generator service (wrapped via wrap_generator_error in
+        -- The error message originates from the GeneratorError raised by the
+        -- generator service (wrapped via wrap_generator_error in
         -- generator-service.allium). The card's errorMessage field is updated
         -- by the implementation for display purposes.
+        -- CardFailed is an internal trigger emitted by the orchestrator after
+        -- the generateDishImage Promise rejects; no surface provides it.
 }
 
 rule GlobalStatusReconciliation {
@@ -305,6 +315,12 @@ open question "FanOutGeneration vs ParseComplete atomicity — both rules fire o
 
 open question "GlobalStatusReconciliation trigger — this spec introduces GlobalStatusReconciliation as a chained trigger emitted by OnCardSucceeded and OnCardFailed. The umbrella's AllItemsSucceeded, SomeItemsSucceeded, AllItemsFailed and PartialBecomesComplete rules also reconcile global_status, triggered by Generation.global_status transitions_to generating/partial. Are both reconciliation mechanisms needed, or should the umbrella rules be removed in favour of this explicit trigger?"
 
-open question "OnDishImageReady / OnDishImageFailed surfaces — these triggers are consumed by OnCardSucceeded and OnCardFailed rules here but no surface in the umbrella or generator-service.allium declares them as entry points from the generator service. A surface update to GeneratorServiceCallbacks is needed. Deferred to the task that integrates the generator service callback wiring."
+-- Resolved (2026-05-14): OnDishImageReady / OnDishImageFailed surfaces —
+-- these were not surface events at all. App.tsx#generateOneCard awaits the
+-- generateDishImage Promise in-process and dispatches the cardSucceeded /
+-- cardFailed reducer actions on resolve / reject. The OnCardSucceeded and
+-- OnCardFailed rules now consume internal CardSucceeded / CardFailed triggers
+-- emitted by the orchestrator, not surface events. No surface declaration is
+-- required.
 
 open question "MenuItem entity plural form — the umbrella declares 'Generation.items' as a relationship but the entity collection plural for invariants should be 'umbrella/Generations'. Confirm the checker resolves qualified entity collection names correctly before promotion."

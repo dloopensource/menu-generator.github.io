@@ -31,24 +31,9 @@ rule SuggestionChipFillsPrompt {
 
 -- Flow: API key change affordance
 
-rule ChangeApiKeyAvailable {
-    -- Clicking the ChangeApiKeyLink emits OnClearApiKey to the api-key spec.
-    when: OnChangeApiKey()
-    ensures:
-        OnClearApiKey()
-
-    @guidance
-        -- A small "Change API key" link appears at the bottom of PromptForm
-        -- when an ApiKey is set. Clicking it emits OnChangeApiKey, which this
-        -- rule forwards to OnClearApiKey for processing by api-key.allium.
-        -- The api-key.ClearRemoves rule consumes OnClearApiKey and removes
-        -- both in-memory and localStorage state.
-        -- The link clears the API key from localStorage and reloads the page so
-        -- that ApiKeyGate re-evaluates and shows the entry form. The reload is
-        -- an implementation choice (simpler than threading setApiKey through the
-        -- component tree); semantically the effect is "re-enter the key." See
-        -- src/components/ChangeApiKeyLink.tsx.
-}
+-- The ChangeApiKeyLink surface emits OnClearApiKey directly on click.
+-- See api-key.allium#ClearRemoves for the rule that consumes the trigger
+-- and clears both localStorage and in-memory state.
 
 ------------------------------------------------------------
 -- Invariants
@@ -85,12 +70,16 @@ surface ChangeApiKeyLink {
     facing user: umbrella/AppUser
 
     provides:
-        OnChangeApiKey()
+        OnClearApiKey()
 
     @guidance
-        -- A small link that appears when an ApiKey is set. Clicking clears the
-        -- key and resets the UI to the ApiKeyGate state. Implementation: renders
-        -- only when an ApiKey exists; hidden when no key is set.
+        -- A small link that appears when an ApiKey is set. Clicking emits
+        -- OnClearApiKey directly (consumed by api-key.allium#ClearRemoves),
+        -- which removes the key from localStorage and in-memory state. The
+        -- UI reload after clearing is an implementation choice in
+        -- src/components/ChangeApiKeyLink.tsx; semantically the effect is
+        -- "re-enter the key" via ApiKeyGate. Renders only when an ApiKey
+        -- exists; hidden otherwise.
 }
 
 ------------------------------------------------------------
