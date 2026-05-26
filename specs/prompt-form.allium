@@ -31,20 +31,9 @@ rule SuggestionChipFillsPrompt {
 
 -- Flow: API key change affordance
 
-rule ChangeApiKeyAvailable {
-    -- Clicking the ChangeApiKeyLink emits OnClearApiKey to the api-key spec.
-    when: OnChangeApiKey()
-    ensures:
-        OnClearApiKey()
-
-    @guidance
-        -- A small "Change API key" link appears at the bottom of PromptForm
-        -- when an ApiKey is set. Clicking it emits OnChangeApiKey, which this
-        -- rule forwards to OnClearApiKey for processing by api-key.allium.
-        -- The api-key.ClearRemoves rule consumes OnClearApiKey and removes
-        -- both in-memory and localStorage state. The ApiKeyGate surface then
-        -- becomes visible again, allowing key re-entry without page reload.
-}
+-- The ChangeApiKeyLink surface emits OnClearApiKey directly on click.
+-- See api-key.allium#ClearRemoves for the rule that consumes the trigger
+-- and clears both localStorage and in-memory state.
 
 ------------------------------------------------------------
 -- Invariants
@@ -81,18 +70,27 @@ surface ChangeApiKeyLink {
     facing user: umbrella/AppUser
 
     provides:
-        OnChangeApiKey()
+        OnClearApiKey()
 
     @guidance
-        -- A small link that appears when an ApiKey is set. Clicking clears the
-        -- key and resets the UI to the ApiKeyGate state. Implementation: renders
-        -- only when an ApiKey exists; hidden when no key is set.
+        -- A small link that appears when an ApiKey is set. Clicking emits
+        -- OnClearApiKey directly (consumed by api-key.allium#ClearRemoves),
+        -- which removes the key from localStorage and in-memory state. The
+        -- UI reload after clearing is an implementation choice in
+        -- src/components/ChangeApiKeyLink.tsx; semantically the effect is
+        -- "re-enter the key" via ApiKeyGate. Renders only when an ApiKey
+        -- exists; hidden otherwise.
 }
 
 ------------------------------------------------------------
 -- Open Questions
 ------------------------------------------------------------
 
-open question "Suggestion chip content and datasource — where do the chip texts come from? Are they hardcoded as component state, loaded from a config file, fetched from an API, or dynamically generated based on context? This spec treats them as opaque UI content."
+-- Resolved (2026-05-14): Suggestion chip content and datasource — chips are
+-- hardcoded as the SUGGESTIONS constant in src/components/SuggestionChips.tsx.
+-- The 4 chip labels (Italian tasting menu / Sunday brunch / Cocktail flight /
+-- Trattoria dinner) and their corresponding prompt payloads are static. No
+-- dynamic loading or API fetch occurs. This spec's treatment of chip texts as
+-- opaque UI content is correct; no spec change required.
 
 open question "OnClearApiKey trigger location — this spec's ChangeApiKeyAvailable rule emits OnClearApiKey, which is defined in api-key.allium. Should OnClearApiKey be declared in the umbrella's surfaces for visibility, or remain local to api-key.allium?"

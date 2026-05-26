@@ -3,6 +3,14 @@
 -- Sub-specs (api-key, prompt-form, reference-photo, menu-generation,
 -- menu-card, generator-service) are defined in later tasks and referenced
 -- from this file via deferred declarations.
+--
+-- Note on allium.deferred.missingLocationHint warnings (audit 2026-05-14):
+-- The checker emits these warnings for each `deferred` declaration below.
+-- The Allium 3.x grammar does not support a structured `@ "path"` location
+-- hint syntax (tested: `deferred X.y @ "path"` is a parse error). The
+-- canonical file locations are recorded in the inline comments on each
+-- `deferred` line. These warnings are cosmetic and pre-existing; they do
+-- not indicate a spec correctness issue.
 
 ------------------------------------------------------------
 -- Enumerations
@@ -131,15 +139,8 @@ config {
 ------------------------------------------------------------
 
 -- Flow: API key management
-
-rule PersistApiKey {
-    when: OnSetApiKey(key)
-    ensures: ApiKey.created(value: key)
-
-    @guidance
-        -- If an ApiKey already exists the implementation replaces it.
-        -- Persistence to localStorage is an implementation detail.
-}
+-- API key persistence is owned by api-key.allium#PersistOnSet.
+-- The umbrella spec only declares the ApiKey entity + OnSetApiKey trigger.
 
 -- Flow: Initial generation state (D2: establishes idle as the starting state)
 
@@ -337,7 +338,7 @@ surface PromptForm {
 
     provides:
         OnGenerateMenu(request: MenuItemRequest)
-        OnSetApiKey(key)
+        OnClearApiKey()
 
     @guidance
         -- The Generate button is disabled while a Generation's global_status
@@ -346,7 +347,8 @@ surface PromptForm {
         -- The reference photo dropzone accepts image/png and image/jpeg only.
         -- Presence of a reference photo suppresses text-prompt parsing (Flow B).
         -- A small "Change API key" link at the bottom of the form provides
-        -- OnSetApiKey without navigating away.
+        -- OnClearApiKey; the user re-enters their key via the ApiKeyGate
+        -- after the existing key is cleared.
 }
 
 surface MenuGrid {
@@ -396,6 +398,9 @@ surface GeneratorServiceCallbacks {
         -- Full trigger semantics and the service-side contract are specified
         -- in generator-service.allium. This surface declares the entry points
         -- so that ParseComplete and ParseFailed rules have a reachable trigger.
+        -- Dish image completion is handled inside App.tsx#generateOneCard via
+        -- Promise await; success/failure dispatches the cardSucceeded/cardFailed
+        -- reducer actions. No surface-level triggers are emitted.
 }
 
 ------------------------------------------------------------
@@ -416,5 +421,14 @@ deferred GeneratorServiceSpec.call -- see: specs/generator-service.allium
 open question "fake_mode_active — fake_mode_active(request) is used as a black box reading the ?fake=true URL flag. Should it be modelled as a derived value on MenuGeneratorApp or remain a black box function?"
 open question "ReferencePhoto mime_type validation — should the spec reject files whose MIME type does not match image/png or image/jpeg at the surface boundary, or is this enforced by the dropzone implementation?"
 open question "ApiKey uniqueness — can multiple ApiKey entities coexist (one per browser tab), or is there a singleton invariant? The localStorage key is shared so concurrent tabs would overwrite each other."
-open question "Generation history — are past Generation entities retained or replaced on each OnGenerateMenu invocation? If retained, MenuGrid must scope to the most recent Generation."
-open question "count field on MenuItemRequest — can it be changed after request creation (e.g. stepper interaction mid-generation), or is it immutable once OnGenerateMenu fires?"
+
+-- Resolved (2026-05-14): Generation history — past Generation entities are NOT
+-- retained. The reducer's `parseSucceeded` action overwrites state.cards,
+-- dropping the previous generation entirely. There is no history. MenuGrid
+-- always binds to the current (single) Generation. No spec change required.
+
+-- Resolved (2026-05-14): count field on MenuItemRequest — the count is captured
+-- into the request at submit time (PromptForm's state at the moment
+-- OnGenerateMenu fires). The stepper may be adjusted between generations; any
+-- change only affects the NEXT generation. Changing count mid-generation has no
+-- effect on the in-flight generation. No spec change required.

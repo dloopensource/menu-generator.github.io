@@ -118,6 +118,13 @@ rule ParseMenuFromTextError {
         -- message. Abort signals must be detected before this rule fires:
         -- if the signal is aborted, AbortError propagates instead (see
         -- ParseMenuFromTextAborted).
+        --
+        -- invalid_key is produced by:
+        --   * status 400 with body containing "reason": "API_KEY_INVALID"
+        --     or "API_KEY_INVALID"-shaped reason indicator
+        --   * status 401 or 403 (defensive — current Gemini API uses 400, but
+        --     defensively maps these in case the API moves to standard HTTP auth
+        --     status codes)
 }
 
 rule ParseMenuFromTextAborted {
@@ -159,6 +166,13 @@ rule ParseMenuFromImageError {
     @guidance
         -- Same wrapping contract as ParseMenuFromTextError. Abort must be
         -- detected upstream before reaching this rule.
+        --
+        -- invalid_key is produced by:
+        --   * status 400 with body containing "reason": "API_KEY_INVALID"
+        --     or "API_KEY_INVALID"-shaped reason indicator
+        --   * status 401 or 403 (defensive — current Gemini API uses 400, but
+        --     defensively maps these in case the API moves to standard HTTP auth
+        --     status codes)
 }
 
 rule ParseMenuFromImageAborted {
@@ -199,6 +213,13 @@ rule GenerateDishImageError {
         -- wrap_generator_error applies the same mapping as for parse operations.
         -- Both geminiMenuGenerator and fakeMenuGenerator must honour this contract:
         -- no raw SDK error may escape to the caller.
+        --
+        -- invalid_key is produced by:
+        --   * status 400 with body containing "reason": "API_KEY_INVALID"
+        --     or "API_KEY_INVALID"-shaped reason indicator
+        --   * status 401 or 403 (defensive — current Gemini API uses 400, but
+        --     defensively maps these in case the API moves to standard HTTP auth
+        --     status codes)
         --
         -- The following SDK FinishReason values map to GeneratorError(content_blocked):
         --   Image model (primary):     IMAGE_SAFETY, IMAGE_PROHIBITED_CONTENT,

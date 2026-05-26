@@ -130,4 +130,7 @@ open question "OnClearApiKey surface entry point — this spec declares ClearRem
 
 open question "LocalStorage.read semantics on first app load — when the app first mounts, should LoadOnMount always read from localStorage, or only if the browser's localStorage is available? The spec treats read_from_local_storage as opaque; should it fail gracefully if localStorage is unavailable (e.g., private browsing), or throw?"
 
-open question "PersistOnSet vs umbrella.PersistApiKey — the umbrella declares a PersistApiKey rule that fires on OnSetApiKey(key) and creates ApiKey.created(value: key). This spec's PersistOnSet rule fires on the same trigger and adds trimming + localStorage logic. Both rules fire on OnSetApiKey. Should they be merged into a single rule in the umbrella, or kept separate by concern (umbrella owns the in-memory semantics, this spec owns storage)?"
+-- Resolved (2026-05-14): PersistOnSet vs umbrella.PersistApiKey —
+-- umbrella.PersistApiKey was removed as a duplicate. PersistOnSet in this spec
+-- is now the single owner of OnSetApiKey, handling trim and localStorage
+-- persistence in one place.
