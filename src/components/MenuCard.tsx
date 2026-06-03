@@ -8,7 +8,11 @@ export function MenuCard({
   onRegenerate,
 }: {
   card: Card;
-  onEdit: (id: string, field: "category" | "name" | "description" | "price", value: string) => void;
+  onEdit: (
+    id: string,
+    field: "category" | "name" | "description" | "price",
+    value: string,
+  ) => void;
   onRegenerate: (id: string) => void;
 }) {
   const [editedValues, setEditedValues] = useState({
@@ -37,7 +41,10 @@ export function MenuCard({
     }
   }, [card]);
 
-  const handleEdit = (field: "category" | "name" | "description" | "price", value: string) => {
+  const handleEdit = (
+    field: "category" | "name" | "description" | "price",
+    value: string,
+  ) => {
     setEditedValues((prev) => ({ ...prev, [field]: value }));
     onEdit(card.id, field, value);
   };
@@ -48,7 +55,8 @@ export function MenuCard({
     return () => URL.revokeObjectURL(url);
   }, [card.imageUrl]);
 
-  const showSkeleton = card.status === "generating" || card.status === "pending";
+  const showSkeleton =
+    card.status === "generating" || card.status === "pending";
   const regenerateDisabled =
     card.status === "pending" && card.name === "" && card.description === "";
 
@@ -56,11 +64,17 @@ export function MenuCard({
     <article className={styles.card}>
       <div className={styles.imgWrap}>
         {card.status === "ready" && card.imageUrl ? (
-          <img className={styles.img} src={card.imageUrl} alt={card.name || "Generated dish"} />
+          <img
+            className={styles.img}
+            src={card.imageUrl}
+            alt={card.name || "Generated dish"}
+          />
         ) : showSkeleton ? (
           <div className={styles.skel} data-testid="card-skeleton" />
         ) : (
-          <p className={styles.error}>{card.errorMessage ?? "Failed to generate"}</p>
+          <p className={styles.error}>
+            {card.errorMessage ?? "Failed to generate"}
+          </p>
         )}
         <input
           className={styles.catInput}
@@ -72,7 +86,9 @@ export function MenuCard({
         <button
           type="button"
           className={styles.regen}
-          aria-label={card.status === "error" ? "Retry / regenerate" : "Regenerate"}
+          aria-label={
+            card.status === "error" ? "Retry / regenerate" : "Regenerate"
+          }
           disabled={regenerateDisabled}
           onClick={() => onRegenerate(card.id)}
         >

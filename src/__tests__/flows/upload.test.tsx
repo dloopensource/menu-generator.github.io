@@ -14,7 +14,9 @@ describe("Flow B — upload reference photo", () => {
     render(<App />);
     const file = new File(["x"], "menu.jpg", { type: "image/jpeg" });
     await user.upload(
-      screen.getByLabelText(/browse for a reference photo/i) as HTMLInputElement,
+      screen.getByLabelText(
+        /browse for a reference photo/i,
+      ) as HTMLInputElement,
       file,
     );
     await user.click(screen.getByRole("button", { name: /generate menu/i }));
@@ -25,7 +27,9 @@ describe("Flow B — upload reference photo", () => {
     // The fake parser returns the hardcoded Italian menu — confirm a known dish name.
     await waitFor(
       () => {
-        expect(screen.getByDisplayValue(/Rigatoni all'Amatriciana/i)).toBeInTheDocument();
+        expect(
+          screen.getByDisplayValue(/Rigatoni all'Amatriciana/i),
+        ).toBeInTheDocument();
       },
       { timeout: 5000 },
     );

@@ -77,7 +77,8 @@ export function fakeMenuGenerator(): MenuGenerator {
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480">` +
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480">` +
         `<rect width="100%" height="100%" fill="hsl(${hue}, 55%, 65%)"/>` +
         `<text x="50%" y="50%" font-family="Georgia, serif" font-size="36" ` +
         `fill="white" text-anchor="middle" dominant-baseline="middle">${label}</text>` +

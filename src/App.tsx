@@ -18,7 +18,8 @@ function useMenuGenerator(): MenuGenerator {
   const { apiKey } = useApiKey();
   const isFake = new URLSearchParams(window.location.search).has("fake");
   return useMemo(
-    () => (isFake || !apiKey ? fakeMenuGenerator() : geminiMenuGenerator(apiKey)),
+    () =>
+      isFake || !apiKey ? fakeMenuGenerator() : geminiMenuGenerator(apiKey),
     [isFake, apiKey],
   );
 }
@@ -57,8 +58,11 @@ function Main() {
   }, []);
 
   const onEdit = useCallback(
-    (id: string, field: "category" | "name" | "description" | "price", value: string) =>
-      dispatch({ type: "editCardField", id, field, value }),
+    (
+      id: string,
+      field: "category" | "name" | "description" | "price",
+      value: string,
+    ) => dispatch({ type: "editCardField", id, field, value }),
     [],
   );
 
@@ -76,7 +80,9 @@ function Main() {
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         const message =
-          err instanceof GeneratorError ? err.message : "Failed to generate image.";
+          err instanceof GeneratorError
+            ? err.message
+            : "Failed to generate image.";
         dispatch({ type: "cardFailed", id: card.id, message });
       }
     },
@@ -93,12 +99,18 @@ function Main() {
       let items: ParsedMenuItem[];
       try {
         items = req.referencePhoto
-          ? await gen.parseMenuFromImage(req.referencePhoto, { signal: controller.signal })
-          : await gen.parseMenuFromText(req.prompt, { signal: controller.signal });
+          ? await gen.parseMenuFromImage(req.referencePhoto, {
+              signal: controller.signal,
+            })
+          : await gen.parseMenuFromText(req.prompt, {
+              signal: controller.signal,
+            });
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         const message =
-          err instanceof GeneratorError ? err.message : "Failed to parse menu input.";
+          err instanceof GeneratorError
+            ? err.message
+            : "Failed to parse menu input.";
         dispatch({ type: "fail", message });
         return;
       }
@@ -131,7 +143,10 @@ function Main() {
       const controller = new AbortController();
       cardAbortRef.current.set(id, controller);
       dispatch({ type: "regenerateCard", id });
-      void generateOneCard({ ...card, status: "generating", imageUrl: null }, controller.signal);
+      void generateOneCard(
+        { ...card, status: "generating", imageUrl: null },
+        controller.signal,
+      );
     },
     [generateOneCard, state.cards],
   );
@@ -148,7 +163,11 @@ function Main() {
         isGenerating={isGenerating}
       />
       <ErrorBanner message={state.globalError} />
-      <MenuGrid cards={state.cards} onEdit={onEdit} onRegenerate={onRegenerate} />
+      <MenuGrid
+        cards={state.cards}
+        onEdit={onEdit}
+        onRegenerate={onRegenerate}
+      />
     </main>
   );
 }

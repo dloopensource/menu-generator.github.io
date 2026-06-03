@@ -24,11 +24,13 @@ export function PromptForm({
 }) {
   const [prompt, setPrompt] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
-  const canSubmit = (prompt.trim().length > 0 || photo !== null) && !isGenerating;
+  const canSubmit =
+    (prompt.trim().length > 0 || photo !== null) && !isGenerating;
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (canSubmit) onGenerate({ prompt: prompt.trim(), referencePhoto: photo, count });
+    if (canSubmit)
+      onGenerate({ prompt: prompt.trim(), referencePhoto: photo, count });
   }
 
   return (

@@ -30,7 +30,10 @@ describe("Flow A — text-only", () => {
     render(<App />);
     await user.type(screen.getByLabelText(/describe today's menu/i), "italian");
     await user.click(screen.getByRole("button", { name: /generate menu/i }));
-    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(4), { timeout: 5000 });
+    await waitFor(
+      () => expect(screen.getAllByRole("article")).toHaveLength(4),
+      { timeout: 5000 },
+    );
 
     // Wait for at least one card to reach ready.
     await waitFor(
@@ -49,7 +52,9 @@ describe("Flow A — text-only", () => {
     // The targeted card should now show a skeleton.
     await waitFor(
       () => {
-        expect(articles[0].querySelector("[data-testid='card-skeleton']")).toBeTruthy();
+        expect(
+          articles[0].querySelector("[data-testid='card-skeleton']"),
+        ).toBeTruthy();
       },
       { timeout: 2000 },
     );
