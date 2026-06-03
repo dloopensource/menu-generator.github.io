@@ -1,4 +1,4 @@
-Create a plan to implement support for more image generation models in the web app.
+Create a new plan to implement support for more image generation models in the web app.
 
 ## Objective
 
