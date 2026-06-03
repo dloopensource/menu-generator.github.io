@@ -8,20 +8,20 @@ menu. The web app will then use the selected model to generate the images based 
 ### New image generation models
 
 - OpenAI Image API (`gpt-image-1` and later models)
-    - Generations: Generate images from scratch based on a text prompt
-    - Edits: Modify existing images using a new prompt, either partially or entirely
+  - Generations: Generate images from scratch based on a text prompt
+  - Edits: Modify existing images using a new prompt, either partially or entirely
 - Google Gemini API:
-    - gemini-3.1-flash-image-preview: This model serves as the high-efficiency counterpart to Gemini 3 Pro Image,
-      optimized for speed and high-volume
-      developer use cases.
-    - gemini-3-pro-image-preview: This model is designed for professional asset production, utilizing advanced
-      reasoning ("Thinking") to follow complex instructions and render high-fidelity text.
+  - gemini-3.1-flash-image-preview: This model serves as the high-efficiency counterpart to Gemini 3 Pro Image,
+    optimized for speed and high-volume
+    developer use cases.
+  - gemini-3-pro-image-preview: This model is designed for professional asset production, utilizing advanced
+    reasoning ("Thinking") to follow complex instructions and render high-fidelity text.
 
 ### Existing image generation models
 
 - Google Gemini API:
-    - gemini-2.5-flash-image: https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-image for image
-      generation
+  - gemini-2.5-flash-image: https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-image for image
+    generation
 
 ## Workflow
 
