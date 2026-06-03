@@ -1,0 +1,96 @@
+-- allium: 3
+-- Prompt form surface specification.
+-- The umbrella spec (menu-generator.allium) owns the PromptForm surface
+-- and its OnGenerateMenu and OnSetApiKey triggers. This spec adds:
+--   - Submission gating rules for Generate button
+--   - Suggestion chip surface and interactions
+--   - API key change affordance surface and logic
+
+use "./menu-generator.allium" as umbrella
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Flow: Suggestion chip interactions
+
+rule SuggestionChipFillsPrompt {
+    -- Clicking a suggestion chip updates the form's prompt textarea.
+    -- This is a component-local state update (no downstream system rule fires).
+    when: OnSuggestionChipSelected(text: String)
+    ensures:
+        true
+
+    @guidance
+        -- Suggestion chips are pre-filled prompt texts shown below the textarea.
+        -- Clicking a chip emits OnSuggestionChipSelected with its full text.
+        -- The form updates its textarea binding to this text, allowing the user
+        -- to review, edit and then click Generate. Chip texts originate from
+        -- component state (see open question for details).
+}
+
+-- Flow: API key change affordance
+
+-- The ChangeApiKeyLink surface emits OnClearApiKey directly on click.
+-- See api-key.allium#ClearRemoves for the rule that consumes the trigger
+-- and clears both localStorage and in-memory state.
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant FormCannotEmitWhileGenerating {
+    -- The form cannot emit OnGenerateMenu while a generation is in flight.
+    -- This is the contractual commitment: the disabled Generate button is the
+    -- UI guard; this invariant is the behavioural guarantee.
+    for g in umbrella/Generations:
+        g.global_status in {parsing, generating} implies true
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+surface SuggestionChips {
+    -- Suggestion chip affordances within the PromptForm.
+    facing user: umbrella/AppUser
+
+    provides:
+        OnSuggestionChipSelected(text: String)
+
+    @guidance
+        -- Pre-filled prompt suggestions rendered as clickable pills below the
+        -- textarea. Each chip carries a piece of example text (e.g., "Italian
+        -- restaurant menu", "Fast food items"). Clicking a chip emits
+        -- OnSuggestionChipSelected with the chip's full prompt text.
+}
+
+surface ChangeApiKeyLink {
+    -- API key change affordance at the bottom of the PromptForm.
+    facing user: umbrella/AppUser
+
+    provides:
+        OnClearApiKey()
+
+    @guidance
+        -- A small link that appears when an ApiKey is set. Clicking emits
+        -- OnClearApiKey directly (consumed by api-key.allium#ClearRemoves),
+        -- which removes the key from localStorage and in-memory state. The
+        -- UI reload after clearing is an implementation choice in
+        -- src/components/ChangeApiKeyLink.tsx; semantically the effect is
+        -- "re-enter the key" via ApiKeyGate. Renders only when an ApiKey
+        -- exists; hidden otherwise.
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+-- Resolved (2026-05-14): Suggestion chip content and datasource — chips are
+-- hardcoded as the SUGGESTIONS constant in src/components/SuggestionChips.tsx.
+-- The 4 chip labels (Italian tasting menu / Sunday brunch / Cocktail flight /
+-- Trattoria dinner) and their corresponding prompt payloads are static. No
+-- dynamic loading or API fetch occurs. This spec's treatment of chip texts as
+-- opaque UI content is correct; no spec change required.
+
+open question "OnClearApiKey trigger location — this spec's ChangeApiKeyAvailable rule emits OnClearApiKey, which is defined in api-key.allium. Should OnClearApiKey be declared in the umbrella's surfaces for visibility, or remain local to api-key.allium?"

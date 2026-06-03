@@ -1,0 +1,321 @@
+-- allium: 3
+-- Canonical service contract for the MenuGenerator abstraction.
+-- Both geminiMenuGenerator (Task 6) and fakeMenuGenerator (Task 5) must
+-- satisfy the observable behaviour declared here.
+-- The umbrella spec (menu-generator.allium) defers to this file via
+-- GeneratorServiceSpec.call and references GeneratorService as a placeholder
+-- actor. This spec is the authoritative owner of:
+--   - ParsedMenuItem (value type — no lifecycle, compared by value)
+--   - DishPrompt (value type)
+--   - GeneratorError (value type)
+--   - GeneratorErrorKind (enum)
+--   - The three MenuGenerator operations and their behavioural contracts
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+external entity MenuGenerator {
+    -- The service object. Managed outside this spec (instantiated by the
+    -- application as either geminiMenuGenerator or fakeMenuGenerator).
+    -- Operations are expressed as triggers below; this entity represents
+    -- the callable boundary. TypeScript declaration: src/services/menuGenerator.ts
+}
+
+external entity AbortSignal {
+    -- Web platform AbortSignal. Managed by the browser / AbortController.
+    -- The spec uses it opaquely: only signal_aborted(signal) is applied to it.
+}
+
+external entity ImageFile {
+    -- A user-supplied image file (image/png or image/jpeg).
+    -- Managed by the browser File API. MIME type validation is the caller's
+    -- responsibility before the file is passed to parseMenuFromImage.
+}
+
+external entity ImageBlob {
+    -- A binary image returned by generateDishImage.
+    -- Managed by the browser Blob API. The caller converts it to an object URL
+    -- via URL.createObjectURL for display.
+}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+value ParsedMenuItem {
+    -- A single menu item returned by the parse operation.
+    -- All fields may be empty strings; an empty result set is valid.
+    -- Canonical declaration. The umbrella spec declares ParsedMenuItem as an
+    -- entity (forward placeholder); this value type is the canonical form
+    -- because ParsedMenuItems have no identity or lifecycle.
+    category: String
+    name: String
+    description: String
+    price: String
+}
+
+value DishPrompt {
+    -- Input to generateDishImage. style_hint is genuinely optional:
+    -- the implementation may substitute a default style when absent.
+    name: String
+    description: String
+    style_hint: String?
+}
+
+value GeneratorError {
+    -- Typed error returned by all non-abort failures.
+    -- Raw SDK errors must not escape the service boundary.
+    kind: GeneratorErrorKind
+    message: String
+}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+enum GeneratorErrorKind {
+    invalid_key
+    | rate_limited
+    | content_blocked
+    | network
+    | unknown
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Flow: parseMenuFromText
+
+rule ParseMenuFromTextReturnsEmpty {
+    -- When the model response contains no identifiable menu items,
+    -- parseMenuFromText resolves to an empty list. It does NOT reject.
+    -- Callers must treat an empty list as a valid outcome, not an error.
+    when: OnParseMenuFromTextNoItems(generator: MenuGenerator, signal: AbortSignal)
+    ensures:
+        ParseMenuFromTextResolved(generator, items: List<ParsedMenuItem>{})
+
+    @guidance
+        -- The empty list path is reached when the model replies with a
+        -- response that contains no structured menu data (e.g. "I don't
+        -- see any menu items in your text"). The implementation should
+        -- parse the model's structured output and return [] rather than
+        -- throwing. Callers (ParseComplete rule in umbrella) must handle
+        -- an empty items list gracefully.
+}
+
+rule ParseMenuFromTextError {
+    -- All non-abort failures from parseMenuFromText are wrapped in
+    -- GeneratorError before propagating. Raw SDK errors must not escape.
+    when: OnParseMenuFromTextFailed(generator: MenuGenerator, signal: AbortSignal, raw_error)
+    ensures:
+        ParseMenuFromTextRejected(generator, error: wrap_generator_error(raw_error))
+
+    @guidance
+        -- wrap_generator_error is a black box that maps SDK-specific errors
+        -- to the appropriate GeneratorErrorKind and extracts a human-readable
+        -- message. Abort signals must be detected before this rule fires:
+        -- if the signal is aborted, AbortError propagates instead (see
+        -- ParseMenuFromTextAborted).
+        --
+        -- invalid_key is produced by:
+        --   * status 400 with body containing "reason": "API_KEY_INVALID"
+        --     or "API_KEY_INVALID"-shaped reason indicator
+        --   * status 401 or 403 (defensive — current Gemini API uses 400, but
+        --     defensively maps these in case the API moves to standard HTTP auth
+        --     status codes)
+}
+
+rule ParseMenuFromTextAborted {
+    -- If the AbortSignal fires before parseMenuFromText completes, the
+    -- promise rejects with a standard AbortError — not wrapped in GeneratorError.
+    when: OnParseMenuFromTextAborted(generator: MenuGenerator, signal: AbortSignal)
+    requires: signal_aborted(signal)
+    ensures:
+        ParseMenuFromTextRejected(generator, error: abort_error())
+
+    @guidance
+        -- abort_error() is a black box producing a standard JS AbortError.
+        -- The AbortError escapes unwrapped by design: callers that cancel
+        -- requests expect a standard AbortError, not a domain GeneratorError.
+}
+
+-- Flow: parseMenuFromImage
+
+rule ParseMenuFromImageReturnsEmpty {
+    -- When the model response contains no identifiable menu items,
+    -- parseMenuFromImage resolves to an empty list. It does NOT reject.
+    when: OnParseMenuFromImageNoItems(generator: MenuGenerator, file: ImageFile, signal: AbortSignal)
+    ensures:
+        ParseMenuFromImageResolved(generator, items: List<ParsedMenuItem>{})
+
+    @guidance
+        -- Accepts image/png and image/jpeg only. MIME type validation is
+        -- the caller's responsibility before this rule fires. The empty-list
+        -- path has the same semantics as ParseMenuFromTextReturnsEmpty:
+        -- resolve, do not reject.
+}
+
+rule ParseMenuFromImageError {
+    -- All non-abort failures from parseMenuFromImage are wrapped in GeneratorError.
+    when: OnParseMenuFromImageFailed(generator: MenuGenerator, file: ImageFile, signal: AbortSignal, raw_error)
+    ensures:
+        ParseMenuFromImageRejected(generator, error: wrap_generator_error(raw_error))
+
+    @guidance
+        -- Same wrapping contract as ParseMenuFromTextError. Abort must be
+        -- detected upstream before reaching this rule.
+        --
+        -- invalid_key is produced by:
+        --   * status 400 with body containing "reason": "API_KEY_INVALID"
+        --     or "API_KEY_INVALID"-shaped reason indicator
+        --   * status 401 or 403 (defensive — current Gemini API uses 400, but
+        --     defensively maps these in case the API moves to standard HTTP auth
+        --     status codes)
+}
+
+rule ParseMenuFromImageAborted {
+    -- If the AbortSignal fires before parseMenuFromImage completes, the
+    -- promise rejects with a standard AbortError.
+    when: OnParseMenuFromImageAborted(generator: MenuGenerator, file: ImageFile, signal: AbortSignal)
+    requires: signal_aborted(signal)
+    ensures:
+        ParseMenuFromImageRejected(generator, error: abort_error())
+
+    @guidance
+        -- Same abort semantics as ParseMenuFromTextAborted. AbortError is
+        -- not wrapped in GeneratorError.
+}
+
+-- Flow: generateDishImage
+
+rule GenerateDishImageSucceeded {
+    -- generateDishImage resolved to an ImageBlob containing the generated image.
+    when: OnGenerateDishImageSucceeded(generator: MenuGenerator, prompt: DishPrompt, signal: AbortSignal, result: ImageBlob)
+    ensures:
+        GenerateDishImageResolved(generator, image: result)
+
+    @guidance
+        -- The ImageBlob is the raw binary image. The caller (CardImageReady rule
+        -- in the umbrella) converts it to an object URL via URL.createObjectURL.
+        -- Image format, dimensions and style are implementation-defined; only
+        -- the ImageBlob type is contractual.
+}
+
+rule GenerateDishImageError {
+    -- All non-abort failures from generateDishImage are wrapped in GeneratorError.
+    when: OnGenerateDishImageFailed(generator: MenuGenerator, prompt: DishPrompt, signal: AbortSignal, raw_error)
+    ensures:
+        GenerateDishImageRejected(generator, error: wrap_generator_error(raw_error))
+
+    @guidance
+        -- wrap_generator_error applies the same mapping as for parse operations.
+        -- Both geminiMenuGenerator and fakeMenuGenerator must honour this contract:
+        -- no raw SDK error may escape to the caller.
+        --
+        -- invalid_key is produced by:
+        --   * status 400 with body containing "reason": "API_KEY_INVALID"
+        --     or "API_KEY_INVALID"-shaped reason indicator
+        --   * status 401 or 403 (defensive — current Gemini API uses 400, but
+        --     defensively maps these in case the API moves to standard HTTP auth
+        --     status codes)
+        --
+        -- The following SDK FinishReason values map to GeneratorError(content_blocked):
+        --   Image model (primary):     IMAGE_SAFETY, IMAGE_PROHIBITED_CONTENT,
+        --                              IMAGE_RECITATION, IMAGE_OTHER, NO_IMAGE
+        --   Text model (defensive):    SAFETY, PROHIBITED_CONTENT, BLOCKLIST, SPII
+        -- These are the 9 values that trigger kind=content_blocked. Text-model values
+        -- are included defensively (they shouldn't fire from generateDishImage, but
+        -- wrap_generator_error maps them anyway for completeness). The impl's
+        -- CONTENT_BLOCKED_FINISH_REASONS set must match this list.
+        -- Verified against @google/genai@2.0.1 FinishReason enum by live probe 2026-05-13.
+}
+
+rule GenerateDishImageAborted {
+    -- If the AbortSignal fires before generateDishImage completes, the
+    -- promise rejects with a standard AbortError — not wrapped in GeneratorError.
+    when: OnGenerateDishImageAborted(generator: MenuGenerator, prompt: DishPrompt, signal: AbortSignal)
+    requires: signal_aborted(signal)
+    ensures:
+        GenerateDishImageRejected(generator, error: abort_error())
+
+    @guidance
+        -- Abort semantics are identical across all three operations. The
+        -- AbortSignal is passed through to underlying SDK calls so that
+        -- in-flight HTTP requests are cancelled as promptly as possible.
+}
+
+------------------------------------------------------------
+-- Contracts
+------------------------------------------------------------
+
+contract MenuGeneratorContract {
+    -- The interface contract that both real and fake implementations must satisfy.
+    -- Observable behaviour modulo timing and image content must be identical.
+    -- On failure, wrap_error returns a GeneratorError; on abort, abort_error()
+    -- returns a standard AbortError outside the GeneratorError hierarchy.
+
+    parse_menu_from_text: (prompt: String, signal: AbortSignal) -> List<ParsedMenuItem>
+    parse_menu_from_image: (file: ImageFile, signal: AbortSignal) -> List<ParsedMenuItem>
+    generate_dish_image: (input: DishPrompt, signal: AbortSignal) -> ImageBlob
+    wrap_error: (raw_error: Any) -> GeneratorError
+
+    @invariant ErrorWrapping
+        -- Every non-abort rejection from any operation carries a GeneratorError.
+        -- No SDK-specific error type escapes the service boundary. Callers can
+        -- unconditionally narrow rejection causes to { AbortError, GeneratorError }
+        -- with no residual "unknown error" case.
+
+    @invariant AbortNotWrapped
+        -- Abort rejections carry a standard JS AbortError, never a GeneratorError.
+        -- This preserves compatibility with AbortController-aware call sites that
+        -- inspect error.name === "AbortError" to detect cancellation.
+
+    @invariant EmptyListNotError
+        -- A parse operation that finds no items resolves with an empty array.
+        -- It does not reject. Callers that treat an empty result as an error
+        -- violate this contract.
+
+    @invariant ImplementationParity
+        -- Real and fake implementations must satisfy identical observable behaviour
+        -- modulo timing (fake resolves synchronously or with minimal delay) and
+        -- image content (fake may return a static placeholder ImageBlob).
+        -- Both geminiMenuGenerator and fakeMenuGenerator are valid implementations.
+
+    @guidance
+        -- TypeScript signature:
+        --   interface MenuGenerator {
+        --     parseMenuFromText(prompt: string, opts: { signal: AbortSignal }): Promise<ParsedMenuItem[]>
+        --     parseMenuFromImage(file: File, opts: { signal: AbortSignal }): Promise<ParsedMenuItem[]>
+        --     generateDishImage(input: DishPrompt, opts: { signal: AbortSignal }): Promise<Blob>
+        --   }
+        -- The opts wrapper follows React hook convention and allows future options
+        -- to be added without breaking the call signature.
+}
+
+------------------------------------------------------------
+-- Actor Declarations
+------------------------------------------------------------
+
+actor GeneratorServiceActor {
+    -- The concrete MenuGenerator instance in use (real or fake).
+    -- This is the canonical actor declaration for the generator service.
+    -- The umbrella spec carries a placeholder GeneratorService actor with
+    -- identified_by: MenuGeneratorApp; that placeholder remains unchanged
+    -- in the umbrella and continues to compile. This declaration is the
+    -- authoritative form for generator-service.allium.
+    identified_by: MenuGenerator
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "ParsedMenuItem canonical owner — the umbrella spec (menu-generator.allium) declares ParsedMenuItem as an entity with four String fields. This spec declares it as a value type (no lifecycle, compared by value). The two declarations coexist in separate files; allium check treats them independently. If a future task collapses these into a single canonical declaration via 'use', the umbrella entity declaration should be replaced with a use import from this spec."
+
+open question "File type validation for parseMenuFromImage — the spec states the operation accepts image/png and image/jpeg (modelled as ImageFile). Should an unsupported MIME type produce a GeneratorError with kind=content_blocked, or a validation error before the service call? Currently modelled as caller responsibility."
+
+open question "style_hint default — when DishPrompt.style_hint is null, what style does generateDishImage apply? The spec leaves this implementation-defined. If a house style is required, it should be declared as a config parameter."
+
+open question "Fake implementation ImageBlob — fakeMenuGenerator must return an ImageBlob from generateDishImage. Should the fake use a static PNG data URL, a 1x1 pixel transparent image, or a more realistic placeholder? This affects test assertions in Task 5."

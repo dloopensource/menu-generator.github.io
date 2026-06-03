@@ -10,7 +10,11 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
 *.local
+
+# Local git worktrees (per superpowers:using-git-worktrees)
+.worktrees/
 
 # Editor directories and files
 .vscode/*

@@ -1,0 +1,154 @@
+-- allium: 3
+-- Reference photo dropzone specification.
+-- The umbrella spec (menu-generator.allium) owns the ReferencePhoto entity declaration.
+-- This spec adds dropzone-specific behaviour:
+--   - Only image/png and image/jpeg MIME types are accepted
+--   - Single file semantics: new selection replaces prior file
+--   - Remove control clears the file, parent receives null
+--   - Drag-and-drop and file input produce equivalent results
+
+use "./menu-generator.allium" as umbrella
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    accepted_mime_types: String = "image/png,image/jpeg"
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Flow: File acceptance and rejection
+
+rule AcceptedMimeTypes {
+    -- The dropzone only accepts files with MIME type image/png or image/jpeg.
+    -- Files with other MIME types are rejected; the parent receives null.
+    when: OnFilePicked(file)
+    requires: file.mime_type = "image/png" or file.mime_type = "image/jpeg"
+    ensures:
+        umbrella/ReferencePhoto.created(
+            file: file_name_from(file),
+            mime_type: file.mime_type
+        )
+
+    @guidance
+        -- The File object's mime_type property is read and validated before
+        -- the ReferencePhoto is created. If validation fails, the ensure
+        -- clause does not execute and the parent state does not change.
+        -- file_name_from is a black box extracting the filename from the File object.
+}
+
+rule RejectInvalidMimeType {
+    -- Files that do not match the accepted MIME types are silently rejected.
+    -- No error is raised; the parent simply receives null (no entity created).
+    when: OnFilePicked(file)
+    requires: file.mime_type != "image/png" and file.mime_type != "image/jpeg"
+    ensures:
+        -- No postcondition: parent receives null; no ReferencePhoto created.
+        true
+
+    @guidance
+        -- This rule documents the rejection path. The parent observes that
+        -- no ReferencePhoto was created, equivalent to a null state.
+}
+
+-- Flow: Single file semantics
+
+rule SingleFileSemantics {
+    -- Selecting or dropping a new file replaces any prior file.
+    -- Only one file is held at a time.
+    when: OnFilePicked(file)
+    requires: file.mime_type = "image/png" or file.mime_type = "image/jpeg"
+    ensures:
+        -- If a prior ReferencePhoto exists, it is replaced (implicit: old entity
+        -- is replaced by the new one at the surface binding).
+        for existing in umbrella/ReferencePhotos:
+            not exists existing
+
+    @guidance
+        -- The parent component maintains a single binding to the current
+        -- ReferencePhoto (or null). Selecting a new file triggers OnFilePicked,
+        -- which clears the old file (if any) and creates a new one. The component
+        -- binding automatically points to the new ReferencePhoto.
+}
+
+-- Flow: Remove resets to null
+
+rule RemoveResetsToNull {
+    -- The remove control on the dropzone clears the file.
+    -- The parent receives null (the ReferencePhoto is removed).
+    when: OnFileRemoved()
+    ensures:
+        for existing in umbrella/ReferencePhotos:
+            not exists existing
+
+    @guidance
+        -- OnFileRemoved is emitted by the remove button or similar control
+        -- on the dropzone UI. All ReferencePhoto entities are removed,
+        -- returning the parent to a null state.
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant HostedFileAlwaysValid {
+    -- The hosted file is always valid (correct MIME type) or null.
+    -- Invalid uploads never reach the parent.
+    for photo in umbrella/ReferencePhotos:
+        photo.mime_type = "image/png" or photo.mime_type = "image/jpeg"
+}
+
+invariant SinglePhotoAtATime {
+    -- At most one ReferencePhoto entity exists at any time.
+    -- (The parent component maintains the binding; the dropzone rules
+    -- ensure only one file is stored.)
+    umbrella/ReferencePhotos.count <= 1
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+surface ReferencePhotoDropzone {
+    -- The file input dropzone for reference photo selection.
+    facing _: umbrella/AppUser
+
+    context photo: umbrella/ReferencePhoto?
+
+    exposes:
+        photo.file
+        photo.mime_type
+
+    provides:
+        OnFilePicked(file)
+        OnFileRemoved()
+
+    @guidance
+        -- The dropzone accepts drag-and-drop and file input selection.
+        -- Only image/png and image/jpeg files are accepted.
+        -- The remove control clears the selection.
+        -- Drag-and-drop and file input produce the same observable result:
+        -- the photo context binding updates to point to the current ReferencePhoto
+        -- (or null if removed).
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "File object properties — the spec treats File.name and File.mime_type as opaque properties read from the browser API. Should these be validated at the surface boundary, or does the browser guarantee accuracy of the mime_type field?"
+
+-- Resolved (2026-05-14): Drag-and-drop vs file input equivalence — both routes
+-- funnel through handlePick(f) in src/components/ReferencePhotoDropzone.tsx.
+-- Identical MIME validation and identical onFileChange(File | null) emission
+-- are applied regardless of how the file was selected. The spec's claim that
+-- both inputs produce the same observable result is confirmed. No spec change
+-- required; the File object identity may differ between paths but the
+-- observable state (ReferencePhoto entity created with same mime_type) is
+-- identical in all cases.
+
+open question "Error reporting on rejection — when a file is rejected due to invalid MIME type, should the surface provide user feedback (error message, toast), or is rejection silent? Currently the spec does not address error reporting."

@@ -1,0 +1,160 @@
+-- allium: 3
+-- Per-card UI behavior specification.
+-- The umbrella spec (menu-generator.allium) owns MenuItem, CardStatus,
+-- OnRegenerateCard and OnEditCardField. This spec adds:
+--   - MenuCardSurface: the rendered card boundary (exposed fields, triggers)
+--   - InlineEditUpdatesItem: editing text fields emits OnEditCardField
+--   - RegenerateButtonBehavior: regenerate button emits OnRegenerateCard,
+--     disabled when status=pending with both name and description empty
+--   - StatusVisualizationContract: card presentation disambiguates status
+--   - ErrorStaysClickable: error cards keep regenerate button enabled
+
+use "./menu-generator.allium" as umbrella
+
+------------------------------------------------------------
+-- Contracts
+------------------------------------------------------------
+
+contract StatusVisualizationContract {
+    -- The rendered card presentation MUST disambiguate the four CardStatus values.
+    render_card: (item: umbrella/MenuItem) -> CardView
+
+    @invariant PendingShowsPlaceholder
+        -- Items with status=pending display editable text fields and disabled
+        -- regenerate button (when both name and description are empty).
+
+    @invariant GeneratingShowsLoadingSkeleton
+        -- Items with status=generating display a loading skeleton for the image.
+
+    @invariant ReadyShowsImage
+        -- Items with status=ready display the actual image from item.image_url.
+
+    @invariant ErrorShowsErrorState
+        -- Items with status=error display an error placeholder, error message,
+        -- and an enabled regenerate button to allow retries.
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Flow: Inline card field editing
+
+rule InlineEditUpdatesItem {
+    -- When the user edits any text field (category, name, description, price),
+    -- emit OnEditCardField so the umbrella's EditCardField rule can update
+    -- the MenuItem and handle status transitions.
+    when: UserEditsCardField(id, field, value)
+    ensures:
+        OnEditCardField(id, field, value)
+
+    @guidance
+        -- UserEditsCardField is a surface-level trigger emitted by MenuCardSurface
+        -- when the user focuses out of a text field. The rule simply reemits the
+        -- trigger for the umbrella to consume. The umbrella's EditCardField rule
+        -- handles the actual field update and subsequent status logic.
+}
+
+-- Flow: Regenerate button behavior
+
+rule RegenerateButtonBehavior {
+    -- When the user clicks the regenerate button, emit OnRegenerateCard.
+    -- The button is disabled when status=pending AND both name and description
+    -- are empty (no useful regeneration without text).
+    when: UserClicksRegenerate(id)
+    ensures:
+        OnRegenerateCard(id)
+
+    @guidance
+        -- UserClicksRegenerate is a surface-level trigger emitted by MenuCardSurface
+        -- when the user clicks the ↻ icon. The surface must disable the button
+        -- when status=pending and both name="" and description="". The rule emits
+        -- OnRegenerateCard, which the umbrella's RegenerateCard rule consumes.
+        -- Error-state cards always keep the button enabled (see ErrorStaysClickable).
+}
+
+rule ErrorStaysClickable {
+    -- Error-state cards do NOT disable the regenerate button. The user can
+    -- click ↻ to retry. This is enforced by the surface constraint, not a
+    -- separate rule; documented here for clarity.
+
+    @guidance
+        -- The MenuCardSurface's render logic must check:
+        --   if status=error: button is ENABLED
+        --   if status=pending and (name="" and description=""): button is DISABLED
+        --   else: button is ENABLED
+        -- This rule is a prose invariant about the surface behaviour.
+}
+
+------------------------------------------------------------
+-- Actor Declarations
+------------------------------------------------------------
+
+actor AppUser {
+    identified_by: umbrella/MenuGeneratorApp
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+surface MenuCardSurface {
+    -- The rendered card representing a single MenuItem. Faces the AppUser.
+    -- Bound to one MenuItem instance. Exposes the card's current state and
+    -- provides triggers for inline editing and regeneration.
+    facing user: AppUser
+
+    context item: umbrella/MenuItem
+
+    exposes:
+        item.status
+        item.category
+        item.name
+        item.description
+        item.price
+        item.image_url
+
+    contracts:
+        fulfils StatusVisualizationContract
+
+    provides:
+        UserEditsCardField(id, field, value)
+        UserClicksRegenerate(id)
+
+    @guidance
+        -- The card is rendered according to its status via StatusVisualizationContract:
+        --   pending (empty name+description): skeleton + editable fields + disabled ↻
+        --   pending (non-empty): skeleton + editable fields + enabled ↻
+        --   generating: skeleton with animation + editable fields + enabled ↻
+        --   ready: actual image + editable fields + enabled ↻
+        --   error: error placeholder + editable fields + enabled ↻
+        -- UserEditsCardField fires when the user focuses out of a text field.
+        -- UserClicksRegenerate fires when the user clicks the ↻ button.
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant CardNeverMutatesDirectly {
+    -- The MenuCardSurface never mutates MenuItem.status directly. It only
+    -- emits triggers (OnEditCardField, OnRegenerateCard) which the umbrella's
+    -- rules consume. Status transitions flow through the reducer logic in
+    -- menu-generation.allium, maintaining a single source of truth.
+}
+
+invariant EditsPropagateLazily {
+    -- Field edits via OnEditCardField propagate to the MenuItem immediately
+    -- (no local pending state). The surface reflects the MenuItem's current
+    -- fields at all times.
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "UserEditsCardField vs direct umbrella OnEditCardField — should MenuCardSurface emit OnEditCardField directly, or should it emit a surface-level UserEditsCardField that this spec's InlineEditUpdatesItem rule translates to OnEditCardField? The current design isolates the surface into domain language (UserEditsCardField) and translates to umbrella language (OnEditCardField), which preserves separation of concerns but adds an indirection layer."
+
+open question "Disabled regenerate button for blank pending cards — the spec guards the button at the surface level (disabled when status=pending and name='' and description=''). Should this guard also be enforced at the rule level (a requires clause on RegenerateCard/OnRegenerateCard), or is surface-level guard sufficient?"
+
+open question "Image URL loading state — when item.image_url is null (between status transitions), should the surface show a blank area, the old image, or a skeleton? The spec does not prescribe this."

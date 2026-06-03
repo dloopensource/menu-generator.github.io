@@ -7,7 +7,7 @@ be created by using the following fields:
 - text-and-image-to-image: Image upload with drag and drop or icon to open file explorer (e.g. opens Mac OS X finder) to
   select an image from the user's device with the menu item(s).
 
-If the user uploads an im/age, the web app will use the image as a reference for the menu item(s). Otherwise, the web
+If the user uploads an image, the web app will use the image as a reference for the menu item(s). Otherwise, the web
 app will then generate a menu item(s) based on the text input.
 
 User will then click the "Generate Menu" button to generate the graphical menu with the text descriptions of each menu

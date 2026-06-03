@@ -1,0 +1,136 @@
+-- allium: 3
+-- API key storage and lifecycle specification.
+-- The umbrella spec (menu-generator.allium) owns the ApiKey entity declaration
+-- and the OnSetApiKey trigger. This spec adds:
+--   - Persistence to localStorage via the LocalStorage abstraction
+--   - Trim-on-set logic (empty strings post-trim are not persisted)
+--   - Load-on-mount from localStorage
+--   - Clear operation to remove both stored and in-memory state
+
+use "./menu-generator.allium" as umbrella
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+external entity LocalStorage {
+    -- The browser's window.localStorage. Opaque key-value store.
+    -- This spec uses the key "menu-generator.geminiApiKey" to store
+    -- the user's API key value across sessions.
+}
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    storage_key: String = "menu-generator.geminiApiKey"
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Flow: API key persistence
+
+rule PersistOnSet {
+    -- When an API key is set (via ApiKeyGate or PromptForm surfaces),
+    -- trim leading and trailing whitespace. If the result is non-empty,
+    -- write it to localStorage under the config.storage_key and update
+    -- the in-memory ApiKey state. Empty strings (post-trim) are not
+    -- persisted; treat them as "no key set".
+    when: OnSetApiKey(key)
+    ensures:
+        let trimmed = trim_whitespace(key)
+        if trimmed != "":
+            -- Persist non-empty key
+            write_to_local_storage(config.storage_key, trimmed)
+        else:
+            -- Empty after trim: treat as clear
+            delete_from_local_storage(config.storage_key)
+
+    @guidance
+        -- trim_whitespace is a black box that removes leading and trailing
+        -- whitespace. An empty result post-trim means the user submitted
+        -- only whitespace, which is treated as clearing the key.
+        -- write_to_local_storage and delete_from_local_storage are black
+        -- boxes wrapping localStorage.setItem and localStorage.removeItem.
+        -- If an ApiKey already exists, the implementation replaces it
+        -- (side-effect is idempotent: same key overwrites the old value).
+}
+
+rule LoadOnMount {
+    -- When the application mounts (MenuGeneratorApp.created is witnessed),
+    -- check localStorage for the key. If present and non-empty, load it
+    -- into the in-memory ApiKey state. If absent or empty, leave state null.
+    when: _: umbrella/MenuGeneratorApp.created
+    ensures:
+        let stored_key = read_from_local_storage(config.storage_key)
+        if stored_key != null and stored_key != "":
+            umbrella/ApiKey.created(value: stored_key)
+
+    @guidance
+        -- read_from_local_storage is a black box wrapping localStorage.getItem.
+        -- Returns null if the key does not exist in localStorage, or the
+        -- string value if it does. This rule fires once on app mount and
+        -- loads the persisted key, if any, into the in-memory state.
+}
+
+rule ClearRemoves {
+    -- Clear operation: remove the API key from both localStorage and
+    -- in-memory state. This is provided by the OnClearApiKey trigger.
+    when: OnClearApiKey()
+    ensures:
+        delete_from_local_storage(config.storage_key)
+        for existing in umbrella/ApiKeys:
+            not exists existing
+
+    @guidance
+        -- OnClearApiKey is emitted by the PromptForm surface or other
+        -- entry points (to be declared) when the user clicks "Change API key"
+        -- or equivalent. Both localStorage and in-memory state are cleared.
+        -- If no ApiKey exists, the postcondition is trivially satisfied
+        -- (idempotent: clearing when nothing exists is safe).
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant ApiKeyValueNeverEmpty {
+    -- When an ApiKey exists, its value is never an empty string.
+    -- Post-trim, either the value is non-empty or the ApiKey is not created.
+    for k in umbrella/ApiKeys:
+        k.value != ""
+}
+
+invariant LocalStorageInSync {
+    -- When an ApiKey exists in memory, its value matches localStorage under
+    -- the config.storage_key. When no ApiKey exists, the localStorage key
+    -- is absent or empty.
+    for k in umbrella/ApiKeys:
+        read_from_local_storage(config.storage_key) = k.value
+}
+
+------------------------------------------------------------
+-- Triggers (to be provided by surfaces)
+------------------------------------------------------------
+
+-- OnClearApiKey(): Emitted by surfaces (PromptForm or dedicated ApiKeyForm)
+-- when the user requests to clear the API key. This trigger is not yet
+-- declared in the umbrella. The ClearRemoves rule responds to it and
+-- clears both localStorage and in-memory state. Hoisting OnClearApiKey to
+-- the umbrella is an open question for a future task.
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "OnClearApiKey surface entry point — this spec declares ClearRemoves rule responding to OnClearApiKey(), but no surface in the umbrella or this spec yet provides this trigger. The PromptForm mentions 'Change API key link' but does not explicitly declare OnClearApiKey(). Should OnClearApiKey be declared in the umbrella's surfaces, or kept local to this spec?"
+
+open question "LocalStorage.read semantics on first app load — when the app first mounts, should LoadOnMount always read from localStorage, or only if the browser's localStorage is available? The spec treats read_from_local_storage as opaque; should it fail gracefully if localStorage is unavailable (e.g., private browsing), or throw?"
+
+-- Resolved (2026-05-14): PersistOnSet vs umbrella.PersistApiKey —
+-- umbrella.PersistApiKey was removed as a duplicate. PersistOnSet in this spec
+-- is now the single owner of OnSetApiKey, handling trim and localStorage
+-- persistence in one place.
